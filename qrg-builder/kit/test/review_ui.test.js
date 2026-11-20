@@ -126,7 +126,7 @@ test("Browser Review UI server binds strictly to 127.0.0.1, falls back to a free
     assert.doesNotMatch(html, /picks-prototype/i);
     assert.doesNotMatch(html, /review_state/i);
     assert.doesNotMatch(html, /Throwaway Prototype/i);
-    assert.doesNotMatch(html, /[\u2013\u2014]/);
+    assert.doesNotMatch(html, new RegExp("[" + String.fromCharCode(0x2013, 0x2014) + "]"));
   } finally {
     if (srv) await srv.close();
     await new Promise((resolve) => blocker.close(resolve));

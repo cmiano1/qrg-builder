@@ -280,11 +280,12 @@ test("pure review-state contract enforces Review Lock, pick toggle, verbatim com
   assert.equal(rs.setPick(initialState, "MISSING 99", "OK to send"), initialState);
 
   // setPick marks a locked guide, does not mutate prior state, and toggles off when clicked again
+  const dashChars = String.fromCharCode(0x2013, 0x2014);
   const s1 = rs.setPick(initialState, "UNIT1-CW 01", "OK to send");
   assert.notEqual(s1, initialState);
   assert.equal(initialState.guides[0].call, "");
   assert.equal(s1.guides[0].call, "OK to send");
-  assert.doesNotMatch(s1.lastEvent || "", /\.json|picks\.json|\u2013|\u2014/i);
+  assert.doesNotMatch(s1.lastEvent || "", new RegExp("\\.json|picks\\.json|[" + dashChars + "]", "i"));
 
   const s2 = rs.setPick(s1, "UNIT1-CW 01", "OK to send");
   assert.equal(s2.guides[0].call, "");
@@ -336,7 +337,7 @@ test("pure review-state contract enforces Review Lock, pick toggle, verbatim com
   assert.equal(skipByCode["UNIT1-SUP 03"].category, "broken");
   assert.equal(skipByCode["UNIT1-CW 03"].category, "held");
   for (const s of planDocx.skipped) {
-    assert.doesNotMatch(s.reason, /[\u2013\u2014]/, "reasons must not contain em/en dashes");
+    assert.doesNotMatch(s.reason, new RegExp("[" + dashChars + "]"), "reasons must not contain em/en dashes");
   }
 
   // computeSendPlan: paired .docx + .pdf when includePdf = true, and keeps NN when sendKeepNumber = true
@@ -1076,7 +1077,7 @@ test("end-to-end real build, LibreOffice render, Review Lock, review_state, .xls
 });
 
 test("review_state, build_ok_list, make_send_copies, config, and test files contain zero em or en dashes", () => {
-  const dashRe = /[\u2013\u2014]/;
+  const dashRe = new RegExp("[" + String.fromCharCode(0x2013, 0x2014) + "]");
   const files = [
     path.join(KIT, "lib", "review_state.js"),
     path.join(KIT, "lib", "config.js"),

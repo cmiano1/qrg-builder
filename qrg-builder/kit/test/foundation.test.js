@@ -276,7 +276,12 @@ test("Worked example end-to-end pipeline: CLI flags, env vars, hand-edit guard, 
     const liveFiles = fs.readdirSync(liveDir).filter((f) => f.endsWith(".docx"));
     assert.equal(liveFiles.length, 1);
     assert.match(liveFiles[0], /^Unit 1 Investigator 01 - Log a Call on a Case - DRAFT \d{8}-\d{4}\.docx$/);
-    const liveGuide01 = path.join(liveDir, liveFiles[0]);
+    const resolveLiveGuide01 = () => {
+      const match = fs.readdirSync(liveDir).find((f) => f.startsWith("Unit 1 Investigator 01 ") && f.endsWith(".docx"));
+      assert.ok(match, "expected live Unit 1 Investigator 01 .docx in " + liveDir);
+      return path.join(liveDir, match);
+    };
+    const liveGuide01 = resolveLiveGuide01();
 
     const holdCli = runNode("build_qrgs.js", [
       "--set=UNIT1-INV",
@@ -304,6 +309,7 @@ test("Worked example end-to-end pipeline: CLI flags, env vars, hand-edit guard, 
     ], { cwd: dir });
     assert.equal(guardOverrideCli.status, 0, guardOverrideCli.stdout + guardOverrideCli.stderr);
     assert.match(guardOverrideCli.stdout, /GUARD OFF/);
+    const liveAfterCli = resolveLiveGuide01();
 
     // 4. Backward-compatible environment variables still work identically.
     const envScratchHold = runNode("build_qrgs.js", ["--set=UNIT1-INV"], {
@@ -318,25 +324,23 @@ test("Worked example end-to-end pipeline: CLI flags, env vars, hand-edit guard, 
     assert.equal(envScratchHold.status, 0, envScratchHold.stdout + envScratchHold.stderr);
     assert.match(envScratchHold.stdout, /DONE \(scratch\)\. 1 guide\(s\)/);
 
-    const refreshedLive01 = path.join(
-      liveDir,
-      fs.readdirSync(liveDir).find((f) => f.startsWith("Unit 1 Investigator 01 ") && f.endsWith(".docx"))
-    );
     const future2 = new Date(Date.now() + 20_000);
-    fs.utimesSync(refreshedLive01, future2, future2);
+    fs.utimesSync(liveAfterCli, future2, future2);
     const guardOverrideEnvLegacy = runNode("build_qrgs.js", ["--set=UNIT1-INV", "--only=Unit 1 Investigator 01 "], {
       cwd: dir,
       env: { ...process.env, ALLOW_REBUILD_OVER_EDITS: "1" },
     });
     assert.equal(guardOverrideEnvLegacy.status, 0, guardOverrideEnvLegacy.stdout + guardOverrideEnvLegacy.stderr);
+    const liveAfterLegacy = resolveLiveGuide01();
 
     const future3 = new Date(Date.now() + 30_000);
-    fs.utimesSync(refreshedLive01, future3, future3);
+    fs.utimesSync(liveAfterLegacy, future3, future3);
     const guardOverrideEnvPrefixed = runNode("build_qrgs.js", ["--set=UNIT1-INV", "--only=Unit 1 Investigator 01 "], {
       cwd: dir,
       env: { ...process.env, QRG_ALLOW_REBUILD_OVER_EDITS: "1" },
     });
     assert.equal(guardOverrideEnvPrefixed.status, 0, guardOverrideEnvPrefixed.stdout + guardOverrideEnvPrefixed.stderr);
+    const refreshedLive01 = resolveLiveGuide01();
 
     // 5. QA passes cleanly on the built worked example and writes qa_text_01.txt.
     const qaClean = runNode("qa_qrgs.js", ["--set=UNIT1-INV", "01"], { cwd: dir });

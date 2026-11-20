@@ -8,7 +8,8 @@ const path = require("path");
 const JSZip = require("jszip");
 
 const SENTENCE_END = /[.!?]/;
-const CLOSERS = /["')\]\u201d\u2019]/;
+const CLOSERS = new RegExp('["\'\\)\\]' + String.fromCharCode(0x201d, 0x2019) + "]");
+const BOM_RE = new RegExp("^" + String.fromCharCode(0xfeff));
 const CALLOUT_PREFIX = /^(?:TIP|NOTE|IMPORTANT)  /;
 
 function unxml(s) {
@@ -46,7 +47,7 @@ async function extractParagraphs(docxInput) {
 function expandDictionaryWords(entries) {
   const words = new Set();
   for (const raw of entries || []) {
-    const entry = String(raw || "").replace(/^\uFEFF/, "").trim();
+    const entry = String(raw || "").replace(BOM_RE, "").trim();
     if (!entry || entry.startsWith("#")) continue;
     words.add(entry);
     for (const part of entry.split(/[\s/,:;()[\]{}-]+/)) {

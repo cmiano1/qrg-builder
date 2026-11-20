@@ -68,7 +68,7 @@ test("init_project seeds qa_dictionary.txt without overwriting, and config loads
     // Populate qa_dictionary.txt with UTF-8 BOM, comments, blank lines, and domain terms, plus config list.
     fs.writeFileSync(
       dictPath,
-      "\uFEFF# Approved product names and UI labels\n\nZyxelWidget\n  OmniDesk  \n# ignored comment\nCaseTrack\n",
+      String.fromCharCode(0xfeff) + "# Approved product names and UI labels\n\nZyxelWidget\n  OmniDesk  \n# ignored comment\nCaseTrack\n",
       "utf8"
     );
     cfg.qa.dictionary = ["CaseTrack", "AcmeFlow Sync"];

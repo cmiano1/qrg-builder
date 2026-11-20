@@ -359,7 +359,8 @@ test("2-page Quick-Start QRG (Make QRGs with the QRG Builder Skill) builds clean
     );
 
     const footerXml = await zip.file("word/footer1.xml").async("string");
-    assert.ok(pText(footerXml).startsWith(TITLE + "  \u00B7  " + FOOTER_TAG), "footer must carry title and tag");
+    const midDot = String.fromCharCode(0x00b7);
+    assert.ok(pText(footerXml).startsWith(TITLE + "  " + midDot + "  " + FOOTER_TAG), "footer must carry title and tag");
     assert.equal(/<w:tab\/>/.test(footerXml), true, "footer must use a real tab element");
 
     // 4. QRG text rules: zero dates, zero session words, zero banned style words.

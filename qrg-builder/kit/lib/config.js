@@ -102,13 +102,14 @@ function loadConfig(argv) {
     return s;
   };
   // Names the QA and the clean scan look for: config list plus the optional names file (one per line).
+  const bomRe = new RegExp("^" + String.fromCharCode(0xfeff));
   const names = [...(cfg.qa.names || [])];
   const nf = cfg.qa.namesFile ? abs(cfg.qa.namesFile) : null;
-  if (nf && fs.existsSync(nf)) for (const n of fs.readFileSync(nf, "utf8").replace(/^\uFEFF/, "").split(/\r?\n/).map((x) => x.trim()).filter((x) => x && !x.startsWith("#"))) names.push(n);
+  if (nf && fs.existsSync(nf)) for (const n of fs.readFileSync(nf, "utf8").replace(bomRe, "").split(/\r?\n/).map((x) => x.trim()).filter((x) => x && !x.startsWith("#"))) names.push(n);
   // Approved words for offline proofing: config list plus the optional dictionary file (one per line).
   const dictionary = [...(cfg.qa.dictionary || [])];
   const df = cfg.qa.dictionaryFile ? abs(cfg.qa.dictionaryFile) : null;
-  if (df && fs.existsSync(df)) for (const w of fs.readFileSync(df, "utf8").replace(/^\uFEFF/, "").split(/\r?\n/).map((x) => x.trim()).filter((x) => x && !x.startsWith("#"))) dictionary.push(w);
+  if (df && fs.existsSync(df)) for (const w of fs.readFileSync(df, "utf8").replace(bomRe, "").split(/\r?\n/).map((x) => x.trim()).filter((x) => x && !x.startsWith("#"))) dictionary.push(w);
   return { cfg, file, root, abs, sets, getSet, names: [...new Set(names)], dictionary: [...new Set(dictionary)], reviewDir: abs(cfg.review.dir), KIT };
 }
 

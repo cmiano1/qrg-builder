@@ -41,6 +41,10 @@ const problems = [];
 if (!/^[A-Za-z0-9-]+$/.test(set.id)) problems.push("--set may use letters, digits, and hyphens only");
 for (const k of ["label", "prefix"]) if (UNSAFE.test(set[k])) problems.push("--" + k + " has a file-name-unsafe character (\\ / : * ? \" < > | # % &): " + set[k]);
 if (set.out.split("/").some((p) => UNSAFE.test(p))) problems.push("--out has a file-name-unsafe character: " + set.out);
+const pageArg = arg("page");
+if (pageArg !== null && pageArg !== "letter") {
+  problems.push('--page "' + pageArg + '" is not supported; QRGs must use Standard US Letter ("letter", 8.5 x 11 in)');
+}
 if (problems.length) { console.error("STOP:\n  " + problems.join("\n  ")); process.exit(2); }
 const KITMODE = arg("kit") || "copy";
 if (!["copy", "skill"].includes(KITMODE)) { console.error("STOP: --kit must be copy or skill"); process.exit(2); }
@@ -58,7 +62,7 @@ const mkdir = (rel) => { const p = path.join(DIR, rel); if (!fs.existsSync(p)) {
 
 // ---- the kit ----
 const KITDIR = KITMODE === "copy" ? path.join(DIR, "qrg_kit") : SKILL_KIT;
-const SKIP = new Set(["node_modules", "playbook", "_work", "package-lock.json"]);
+const SKIP = new Set(["node_modules", "playbook", "_work"]);
 function copyKit(src, dst) {
   fs.mkdirSync(dst, { recursive: true });
   for (const e of fs.readdirSync(src, { withFileTypes: true })) {
@@ -87,6 +91,10 @@ if (KITMODE === "copy") {
 const cfgPath = path.join(DIR, "qrg.config.json");
 if (fs.existsSync(cfgPath)) {
   const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+  if (cfg.page != null && cfg.page !== "letter") {
+    console.error('STOP: qrg.config.json page "' + cfg.page + '" is not supported; QRGs must use Standard US Letter ("letter", 8.5 x 11 in).');
+    process.exit(2);
+  }
   cfg.sets = cfg.sets || [];
   const have = cfg.sets.find((s) => s.id === set.id);
   if (have) { said.push("SKIPPED (exists) set " + set.id + " in qrg.config.json (its settings are kept; edit the config to change them)"); Object.assign(set, have); }

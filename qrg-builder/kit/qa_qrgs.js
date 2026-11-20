@@ -23,6 +23,7 @@ const { loadConfig, arg, flag } = require("./lib/config"); // first: it stops pl
 const JSZip = require("jszip");
 const mammoth = require("mammoth");
 const { lintDocx } = require("./tools/gdocs_lint.js");
+const { decimalNumberingLevels, isNumberedStep, hasKeepNext, hasKeepLines } = require("./lib/docx_helpers.js");
 
 const P = loadConfig();
 const setId = arg("set") || process.env.QRG_SET;
@@ -105,7 +106,11 @@ function captionSteps(cap) {
       else console.log("  warn google " + r.rule + ": " + r.detail);
     }
     const pg = xml.match(/<w:pgSz[^>]*>/)[0], mar = xml.match(/<w:pgMar[^>]*>/)[0];
-    const contentW = +attr(pg, "w") - +attr(mar, "left") - +attr(mar, "right");
+    const mTop = +attr(mar, "top"), mBot = +attr(mar, "bottom"), mLeft = +attr(mar, "left"), mRight = +attr(mar, "right");
+    const contentW = +attr(pg, "w") - mLeft - mRight;
+    if (mTop !== 1440 || mBot !== 1440 || mLeft !== 1440 || mRight !== 1440 || contentW !== 9360) {
+      fail(`US Letter margins must be 1 in (1440 twips) with 6.5 in (9360 twips) content width; got margins ${mTop}/${mRight}/${mBot}/${mLeft}, content width ${contentW}`);
+    }
     console.log(`  page ${attr(pg, "w")} x ${attr(pg, "h")} twips, content width ${contentW}; tables ${xml.split("<w:tbl>").length - 1}; `
       + `google lint ${lint.filter((r) => r.level === "FAIL").length} fail, ${lint.filter((r) => r.level === "WARN").length} warn`);
 
@@ -134,21 +139,22 @@ function captionSteps(cap) {
 
     // Every numbered step on one list, and no list overrides left.
     const numIds = [...xml.matchAll(/<w:numPr>[\s\S]*?<w:numId w:val="(\d+)"\/>/g)].map((m) => m[1]);
-    const numbering = await zip.file("word/numbering.xml").async("string");
+    const numbering = zip.file("word/numbering.xml") ? await zip.file("word/numbering.xml").async("string") : "";
     console.log(`  numbered paragraphs: ${numIds.length} on numId ${[...new Set(numIds)].join(",")}; lvlOverride left: ${/<w:lvlOverride/.test(numbering)}`);
     if (/<w:lvlOverride/.test(numbering)) fail("numbering still has lvlOverride (pack() did not run)");
 
     // Page-break rules: every step keeps its lines together, and the run of steps just before a figure keeps with it.
-    const isStep = (p) => p.includes("<w:numPr>") && p.includes("<w:keepNext") && !p.includes("<w:drawing>");
+    const decimalMap = decimalNumberingLevels(numbering);
+    const isStep = (p) => isNumberedStep(p, decimalMap);
     const stepParas = paras.filter(isStep);
-    const noKeepLines = stepParas.filter((p) => !p.includes("<w:keepLines/>")).length;
+    const noKeepLines = stepParas.filter((p) => !hasKeepLines(p)).length;
     // keepRun: N in the guide file checks only the last N steps before each figure (for a long run that cannot all fit).
     const gfile = path.join(SET.guidesDir, nn + ".js");
     const keepRun = fs.existsSync(gfile) ? +((fs.readFileSync(gfile, "utf8").match(/^\s*keepRun:\s*(\d+)/m) || [])[1] || Infinity) : Infinity;
     let loose = 0;
     paras.forEach((p, i) => {
-      if (!p.includes("<w:drawing>")) return;
-      for (let j = i - 1, k = 0; j >= 0 && isStep(paras[j]) && k < keepRun; j--, k++) if (!paras[j].includes("<w:keepNext/>")) loose++;
+      if (!/<w:drawing\b/.test(p.slice(0, p.indexOf("</w:p>") === -1 ? p.length : p.indexOf("</w:p>")))) return;
+      for (let j = i - 1, k = 0; j >= 0 && isStep(paras[j]) && k < keepRun; j--, k++) if (!hasKeepNext(paras[j])) loose++;
     });
     console.log(`  steps: ${stepParas.length}; without keepLines: ${noKeepLines}; steps before a figure not kept with it: ${loose}`);
     if (noKeepLines) fail(noKeepLines + " step(s) can split across pages (no keepLines)");

@@ -4,12 +4,12 @@ A config-driven kit that builds Quick Reference Guides as Word files, checks the
 carries them through a review gate (lock, OK List, send copies). The process and the writing rules are in the
 skill: `../SKILL.md` and `../references/`. This file is the technical reference: every config key and every script.
 
-Needs Windows, Git Bash, Node 20 or newer, and desktop Word (for renders and proofing). Build and QA also run
-without Word.
+Needs Node 22 or newer (LTS). Build and QA run on Windows, macOS, and Linux without desktop Word.
 
 ```sh
-npm install            # about 60 MB. Never with --omit=optional (it drops sharp's Windows image library)
-npm run check          # syntax, packages, Word: should end "RESULT: kit ready"
+npm install            # about 60 MB. Never with --omit=optional (it drops sharp's platform image library)
+npm run check          # syntax, Node 22+, packages: should end "RESULT: kit ready"
+npm test               # built-in Node test runner: end-to-end worked example + Google Docs lint self-test
 npm run add-video      # only for the video tools (about 400 MB)
 ```
 
@@ -47,7 +47,7 @@ kit. Paths in it are relative to its own folder. Keys starting with `_` are note
 | `project` | `Project` | Shown on the OK List |
 | `author` | `Change Management` | Written as the document author and last-modified-by. The clean scan reads any other last-modified-by as a hand save. |
 | `status` | `DRAFT` | In every file name; capital letters only |
-| `page` | `letter` | `letter` or `a4` |
+| `page` | `letter` | Standard US Letter (`8.5 x 11 in`, `1 in` margins, `6.5 in` content width) only; A4 is rejected |
 | `font` | `Calibri` | The one font used everywhere (Google-safe) |
 | `palette` | red and gray | `accent`, `heading`, `grey`, `light`, `tip`, `warn` as hex without # |
 | `sections` | Purpose ... Troubleshooting | Section order the QA checks |
@@ -113,7 +113,7 @@ module.exports = (H) => {
 | `afig(K, png, caption, widthIn)` | Figure and caption (spread it); one line, K first |
 
 `**bold**` works in every text helper. Optional guide keys: `file` (default `<prefix> NN - <title>`), `hold: true`
-(not built unless `QRG_INCLUDE_HOLD=1`), `figMaxH` (inches), `keepRun` (QA only). `R()` (cross-references) throws
+(not built unless `--include-hold` or `QRG_INCLUDE_HOLD=1`), `figMaxH` (inches), `keepRun` (QA only). `R()` (cross-references) throws
 on purpose.
 
 ## Scripts
@@ -122,7 +122,7 @@ All run from anywhere under the project. `K` is `qrg_kit` (copy mode) or the ski
 
 | Script | What | Main options |
 |---|---|---|
-| `build_qrgs.js` | Builds guides for a set; moves the prior build to `_archive/`; writes the build log. Stops if a live build was hand-edited or is open in Word. | `--set=<id>`; env `QRG_ONLY="<prefix> NN "`, `QRG_SCRATCH=1`, `QRG_INCLUDE_HOLD=1`, `ALLOW_REBUILD_OVER_EDITS=1` (only after folding edits in) |
+| `build_qrgs.js` | Builds guides for a set; moves the prior build to `_archive/`; writes the build log. Stops if a live build was hand-edited or is open in Word. | `--set=<id>`, `--scratch`, `--only="<prefix> NN "`, `--include-hold`, `--allow-rebuild-over-edits` (legacy env vars `QRG_SCRATCH=1`, `QRG_ONLY`, `QRG_INCLUDE_HOLD=1`, `ALLOW_REBUILD_OVER_EDITS=1`, `QRG_ALLOW_REBUILD_OVER_EDITS=1` also work) |
 | `qa_qrgs.js` | Google lint, structure, page-break rules, footer, figures against badges, text checks. Writes `_work/qa_text_NN.txt`. Exit 1 on any finding. | `--set=<id> [NN] [--scratch] [--file=<docx>]` |
 | `scripts/init_project.js` | Sets up a project or adds a set. Never overwrites. | `--dir --project --set --label --prefix --unit-line --footer-tag --asset-key --out --kit=copy\|skill --upgrade-kit --install` |
 | `scripts/new_guide.js` | Starts a guide file and its asset folder, or the worked example. | `--set=<id> NN "<Title>" ["<Subtitle>"]`, `--set=<id> --example` |
@@ -151,9 +151,15 @@ A lock older than its stale time (10 minutes for render, 15 for build) is treate
 
 ## Versions
 
-`package.json` `version` is the kit version. `init_project.js` copies the kit into a project and reports the
-version; `--upgrade-kit` replaces a project's copy (the old copy goes to `_archive_backups/`). Bump the version
-whenever the kit changes.
+`package.json` `version` is the kit version (`2.0.0`, requiring Node.js `>=22`). `init_project.js` copies the kit and
+its `package-lock.json` into a project and reports the version; `--upgrade-kit` replaces a project's copy (the old copy
+goes to `_archive_backups/`). Bump the version whenever the kit changes.
+
+`docx` is exact-pinned to `8.5.0` in `package.json` (and locked via `package-lock.json`). `lib/docx_helpers.js` depends
+on `docx` v8 constructor shapes (such as `ImageRun`, `numbering.config`, and `lastModifiedBy`) that changed in `docx`
+9.x, and `pack()` plus `tools/gdocs_lint_selftest.js` inspect and transform generated OOXML parts. Keeping `8.5.0`
+pinned ensures identical Google-Docs-safe XML across teammates; any future upgrade must pass `npm test` (including
+`gdocs_lint_selftest.js`) and visual page-render verification.
 
 ## Source of truth
 

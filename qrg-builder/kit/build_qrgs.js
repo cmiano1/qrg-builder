@@ -11,16 +11,18 @@
  *
  * SOURCE OF TRUTH: GENERATOR IS MASTER (this file, lib/docx_helpers.js, and the guide files). A guard stops the run if a
  * built guide in the output folder was edited after it was built, or if another file with the same name prefix appeared
- * there. Fold the edits into the guide file first (diff the XML, render both), then rerun with ALLOW_REBUILD_OVER_EDITS=1.
+ * there. Fold the edits into the guide file first (diff the XML, render both), then rerun with --allow-rebuild-over-edits.
  * A build also stops if the guide's prior build is open in Word (it cannot be moved to _archive/ while open).
  *
- * Run (Git Bash, from the kit folder or anywhere under the project):
+ * Run (PowerShell, CMD, macOS Terminal, or Linux Bash, from the kit folder or anywhere under the project):
  *   node build_qrgs.js --set=<id>                                   every guide in the set
- *   QRG_ONLY="<prefix> 03 " node build_qrgs.js --set=<id>           one guide (a regex on the file name)
- *   QRG_SCRATCH=1 QRG_ONLY="<prefix> 03 " node build_qrgs.js --set=<id>
+ *   node build_qrgs.js --set=<id> --only="<prefix> 03 "             one guide (a regex on the file name)
+ *   node build_qrgs.js --set=<id> --scratch --only="<prefix> 03 "
  *       a test build to <set dir>/_work/scratch/; leaves the live folder, the guard, and the build log alone
- *   QRG_INCLUDE_HOLD=1     also build guides marked hold: true
- *   ALLOW_REBUILD_OVER_EDITS=1   only after the hand edits are folded in
+ *   --include-hold                also build guides marked hold: true
+ *   --allow-rebuild-over-edits    only after the hand edits are folded in
+ *   (Legacy env vars QRG_SCRATCH=1, QRG_ONLY, QRG_INCLUDE_HOLD=1, ALLOW_REBUILD_OVER_EDITS=1,
+ *    and QRG_ALLOW_REBUILD_OVER_EDITS=1 also remain supported.)
  * QA: node qa_qrgs.js --set=<id> [NN] [--scratch]
  * Render: node scripts/render_guides.js --set=<id> [NN]   (a scratch build: --file="<docx>")
  * A live build takes the project build lock (lib/lock.js), so two agents never write the build log at once.
@@ -38,16 +40,37 @@
  * =================================================================== */
 const fs = require("fs");
 const path = require("path");
-const { loadConfig, stamp, arg, UNSAFE } = require("./lib/config");
+const { loadConfig, stamp, arg, flag, UNSAFE } = require("./lib/config");
 const { makeHelpers } = require("./lib/docx_helpers");
 const { acquire } = require("./lib/lock");
 
+function readOnlyPattern(argv) {
+  const eq = arg("only", argv);
+  if (eq !== null) return eq;
+  const idx = argv.indexOf("--only");
+  if (idx !== -1) {
+    const next = argv[idx + 1];
+    if (!next || next.startsWith("--")) {
+      console.error("STOP: --only requires a pattern (for example --only=\"<prefix> 01 \")");
+      process.exit(2);
+    }
+    return next;
+  }
+  return process.env.QRG_ONLY || null;
+}
+
 const P = loadConfig();
+const cliArgs = process.argv.slice(2);
 const setId = arg("set") || process.env.QRG_SET;
-if (!setId) { console.error("usage: node build_qrgs.js --set=<id>   (sets: " + P.sets.map((s) => s.id).join(", ") + ")"); process.exit(2); }
+if (!setId) { console.error("usage: node build_qrgs.js --set=<id> [--scratch] [--only=<pattern>] [--include-hold] [--allow-rebuild-over-edits]   (sets: " + P.sets.map((s) => s.id).join(", ") + ")"); process.exit(2); }
 const SET = P.getSet(setId);
 const STATUS = P.cfg.status;
-const SCRATCH = process.env.QRG_SCRATCH === "1";
+const SCRATCH = flag("scratch") || process.env.QRG_SCRATCH === "1";
+const INCLUDE_HOLD = flag("include-hold") || process.env.QRG_INCLUDE_HOLD === "1";
+const ALLOW_REBUILD = flag("allow-rebuild-over-edits")
+  || process.env.ALLOW_REBUILD_OVER_EDITS === "1"
+  || process.env.QRG_ALLOW_REBUILD_OVER_EDITS === "1";
+const ONLY_RAW = readOnlyPattern(cliArgs);
 const KEY = SET.assetKey || SET.id.replace(/[^A-Za-z0-9]/g, "");
 
 const base = makeHelpers(P.cfg, { assetsDir: SET.assetsDir, unitLine: SET.unitLine });
@@ -89,14 +112,19 @@ function makeDoc(q) {
 function readLog() { return fs.existsSync(SET.logFile) ? JSON.parse(fs.readFileSync(SET.logFile, "utf8")) : { files: {} }; }
 // Every prior build of a guide in the output folder must be the build this script last wrote, unchanged.
 function guard(guides, log) {
-  if (process.env.ALLOW_REBUILD_OVER_EDITS === "1") { console.log("GUARD OFF (ALLOW_REBUILD_OVER_EDITS=1)"); return; }
+  if (ALLOW_REBUILD) {
+    const how = flag("allow-rebuild-over-edits") ? "--allow-rebuild-over-edits"
+      : process.env.QRG_ALLOW_REBUILD_OVER_EDITS === "1" ? "QRG_ALLOW_REBUILD_OVER_EDITS=1" : "ALLOW_REBUILD_OVER_EDITS=1";
+    console.log("GUARD OFF (" + how + ")");
+    return;
+  }
   for (const q of guides) {
     const known = (log.files || {})[q.file];
     for (const f of fs.readdirSync(SET.outDir).filter((x) => priorRe(q.file).test(x))) {
       const mt = fs.statSync(path.join(SET.outDir, f)).mtimeMs;
       if (!known || known.file !== f || mt > known.mtimeMs + 2000) {
         console.error("STOP: " + f + " was edited or added after the last build. Diff it, fold the edits into guides/"
-          + q.nn + ".js, then rerun with ALLOW_REBUILD_OVER_EDITS=1.");
+          + q.nn + ".js, then rerun with --allow-rebuild-over-edits.");
         process.exit(2);
       }
     }
@@ -106,7 +134,7 @@ function guard(guides, log) {
 function stopIfOpen(guides, dir) {
   for (const q of guides) for (const f of fs.readdirSync(dir).filter((x) => priorRe(q.file).test(x))) {
     try { fs.closeSync(fs.openSync(path.join(dir, f), "r+")); } catch (e) {
-      console.error("STOP: " + f + " is open (" + e.code + "), probably in Word. Close it, then rerun. For a test build while it is open: QRG_SCRATCH=1.");
+      console.error("STOP: " + f + " is open (" + e.code + "), probably in Word. Close it, then rerun. For a test build while it is open: pass --scratch.");
       process.exit(3);
     }
   }
@@ -114,15 +142,15 @@ function stopIfOpen(guides, dir) {
 
 (async () => {
   const s = stamp();
-  const ONLY = process.env.QRG_ONLY ? new RegExp(process.env.QRG_ONLY) : null;
+  const ONLY = ONLY_RAW ? new RegExp(ONLY_RAW) : null;
   for (const [nn, e] of Object.entries(LOAD_ERRORS)) {
     if (!ONLY || ONLY.test(SET.prefix + " " + nn + " ")) { console.error("ERROR: guides/" + nn + ".js does not load: " + (e.stack || e)); process.exit(1); }
     console.log("SKIPPED (does not load) guides/" + nn + ".js: " + e.message);
   }
   if (!QRGS.length) { console.error("No guide files in " + SET.guidesDir); process.exit(1); }
-  const toBuild = QRGS.filter((q) => (!ONLY || ONLY.test(q.file + " ")) && (!q.hold || process.env.QRG_INCLUDE_HOLD === "1"));
+  const toBuild = QRGS.filter((q) => (!ONLY || ONLY.test(q.file + " ")) && (!q.hold || INCLUDE_HOLD));
   for (const q of QRGS) if (q.hold && !toBuild.includes(q) && (!ONLY || ONLY.test(q.file + " "))) console.log("SKIPPED (on hold) " + q.file);
-  if (!toBuild.length) { console.error("Nothing to build (check QRG_ONLY)."); process.exit(1); }
+  if (!toBuild.length) { console.error("Nothing to build (check --only / QRG_ONLY)."); process.exit(1); }
 
   if (SCRATCH) {
     fs.mkdirSync(SET.scratchDir, { recursive: true });

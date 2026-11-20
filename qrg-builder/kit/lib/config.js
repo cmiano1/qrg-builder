@@ -64,7 +64,13 @@ function loadConfig(argv) {
   const abs = (p) => path.resolve(root, p);
   const problems = [];
   if (!/^[A-Z]+$/.test(cfg.status)) problems.push('status must be capital letters (for example "DRAFT")');
-  if (!["letter", "a4"].includes(cfg.page)) problems.push('page must be "letter" or "a4"');
+  if (cfg.page !== "letter") {
+    problems.push(
+      cfg.page === "a4"
+        ? 'page "a4" is not supported; QRGs must use Standard US Letter ("letter", 8.5 x 11 in)'
+        : 'page must be "letter" (Standard US Letter, 8.5 x 11 in); got ' + JSON.stringify(cfg.page)
+    );
+  }
   const ids = new Set(), prefixes = new Set();
   for (const s of cfg.sets) {
     for (const k of ["id", "prefix", "unitLine", "footerTag", "dir", "out"]) if (!s[k]) problems.push("set " + (s.id || "?") + ": missing " + k);

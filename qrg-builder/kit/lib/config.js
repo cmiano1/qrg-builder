@@ -48,6 +48,7 @@ const DEFAULTS = {
   figureMaxHeightIn: 5.25,
   sets: [],
   qa: { names: [], namesFile: "qa_names.txt", dictionary: [], dictionaryFile: "qa_dictionary.txt", styleAllow: [], sessionWords: null, idPatterns: [], extraBanned: [] },
+  render: { soffice: null },
   review: { dir: "review" },
 };
 
@@ -59,7 +60,8 @@ function loadConfig(argv) {
   }
   const raw = JSON.parse(fs.readFileSync(file, "utf8"));
   const cfg = { ...DEFAULTS, ...raw, palette: { ...DEFAULTS.palette, ...(raw.palette || {}) },
-    qa: { ...DEFAULTS.qa, ...(raw.qa || {}) }, review: { ...DEFAULTS.review, ...(raw.review || {}) } };
+    qa: { ...DEFAULTS.qa, ...(raw.qa || {}) }, render: { ...DEFAULTS.render, ...(raw.render || {}) },
+    review: { ...DEFAULTS.review, ...(raw.review || {}) } };
   const root = path.dirname(file);
   const abs = (p) => path.resolve(root, p);
   const problems = [];

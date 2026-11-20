@@ -1,0 +1,75 @@
+{
+  "srcDir": "src",
+  "outDir": "out",
+  "displayWidth": 600,
+  "badgeIn": 0.24,
+  "guide": "../../guides/01.js",
+  "figures": [
+    {
+      "src": "example_case.png",
+      "out": "ex01_f01_logacall.png",
+      "note": "Example. The Activity tab and the row of buttons under it. Source: made-up screen from make_example_png.js. Cropped to the tab strip and the buttons; the header, highlights, and side card are left out.",
+      "crop": {
+        "left": 16,
+        "top": 150,
+        "width": 728,
+        "height": 110
+      },
+      "boxes": [
+        {
+          "x": 124,
+          "y": 12,
+          "w": 100,
+          "h": 36,
+          "n": 1,
+          "badge": "r"
+        },
+        {
+          "x": 176,
+          "y": 56,
+          "w": 126,
+          "h": 44,
+          "n": 2,
+          "badge": "r"
+        }
+      ]
+    },
+    {
+      "src": "example_case.png",
+      "out": "ex01_f02_callform.png",
+      "note": "Example. The call form: Subject, Comments, and Save. Source: made-up screen from make_example_png.js. Cropped to the form.",
+      "crop": {
+        "left": 0,
+        "top": 262,
+        "width": 756,
+        "height": 340
+      },
+      "boxes": [
+        {
+          "x": 50,
+          "y": 58,
+          "w": 652,
+          "h": 64,
+          "n": 3,
+          "badge": "l"
+        },
+        {
+          "x": 50,
+          "y": 132,
+          "w": 652,
+          "h": 138,
+          "n": 4,
+          "badge": "l"
+        },
+        {
+          "x": 614,
+          "y": 276,
+          "w": 88,
+          "h": 46,
+          "n": 5,
+          "badge": "r"
+        }
+      ]
+    }
+  ]
+}

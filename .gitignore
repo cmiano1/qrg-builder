@@ -1,0 +1,10 @@
+node_modules/
+_work/
+_archive/
+_archive_backups/
+_send/
+~$*.docx
+~$*.xlsx
+*.tmp
+.DS_Store
+Thumbs.db

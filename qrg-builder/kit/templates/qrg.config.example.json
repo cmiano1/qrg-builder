@@ -33,6 +33,6 @@
     "extraBanned": [],
     "sessionWords": null
   },
-  "_review_help": "dir: locks, renders, and OK List sheets. sendDir: local folder for clean-named copies to move by hand. sendKeepNumber: true keeps the NN in send names.",
-  "review": { "dir": "review", "sendDir": "_send", "sendKeepNumber": false }
+  "_review_help": "dir: locks, renders, saved review state, and OK List sheets. sendDir: local folder for clean-named copies to move by hand. sendKeepNumber: true keeps the NN in send names. withPdf: true stages a verified locked Render PDF alongside each clean-named Word Send Copy by default (can be overridden per run with --with-pdf or --no-pdf).",
+  "review": { "dir": "review", "sendDir": "_send", "sendKeepNumber": false, "withPdf": false }
 }

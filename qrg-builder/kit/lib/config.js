@@ -49,7 +49,7 @@ const DEFAULTS = {
   sets: [],
   qa: { names: [], namesFile: "qa_names.txt", dictionary: [], dictionaryFile: "qa_dictionary.txt", styleAllow: [], sessionWords: null, idPatterns: [], extraBanned: [] },
   render: { soffice: null },
-  review: { dir: "review" },
+  review: { dir: "review", sendDir: "_send", sendKeepNumber: false, withPdf: false },
 };
 
 function loadConfig(argv) {
@@ -72,6 +72,9 @@ function loadConfig(argv) {
         ? 'page "a4" is not supported; QRGs must use Standard US Letter ("letter", 8.5 x 11 in)'
         : 'page must be "letter" (Standard US Letter, 8.5 x 11 in); got ' + JSON.stringify(cfg.page)
     );
+  }
+  if (typeof cfg.review.withPdf !== "boolean") {
+    problems.push("review.withPdf must be true or false");
   }
   const ids = new Set(), prefixes = new Set();
   for (const s of cfg.sets) {

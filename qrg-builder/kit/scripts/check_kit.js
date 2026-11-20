@@ -1,9 +1,12 @@
 // check_kit.js: a quick health check of the kit install. Syntax-checks every kit script (node --check, which never
-// runs a build), checks the packages and their versions, and checks that Word and PowerShell can be found for renders.
+// runs a build), checks the packages and native/ESM modules (sharp, @napi-rs/canvas, pdfjs-dist), and checks
+// cross-platform DOCX-to-PDF renderer availability (LibreOffice, Portable/AppImage, or Windows Word fallback).
 // Usage: node qrg_kit/scripts/check_kit.js     (or  npm run check  in the kit folder)
 const fs = require("fs");
 const path = require("path");
+const { pathToFileURL } = require("url");
 const { spawnSync } = require("child_process");
+const { discoverRenderer } = require("../lib/render");
 
 const KIT = path.resolve(__dirname, "..");
 const MIN_NODE_MAJOR = 22;
@@ -13,9 +16,11 @@ function isSupportedNodeVersion(version = process.versions.node) {
   return Number.isFinite(major) && major >= MIN_NODE_MAJOR;
 }
 
-function runCheck() {
+async function runCheck(opts = {}) {
   let bad = 0;
-  const ok = (m) => console.log("  ok   " + m), no = (m) => { bad++; console.log("  FAIL " + m); }, warn = (m) => console.log("  warn " + m);
+  const ok = (m) => console.log("  ok   " + m);
+  const no = (m) => { bad++; console.log("  FAIL " + m); };
+  const warn = (m) => console.log("  warn " + m);
 
   console.log("Kit " + KIT);
   const pkg = JSON.parse(fs.readFileSync(path.join(KIT, "package.json"), "utf8"));
@@ -24,11 +29,13 @@ function runCheck() {
 
   console.log("\nScripts");
   const files = [];
-  const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-    if (["node_modules", "_work", "_archive"].includes(e.name)) continue;
-    const p = path.join(d, e.name);
-    if (e.isDirectory()) walk(p); else if (e.name.endsWith(".js")) files.push(p);
-  } };
+  const walk = (d) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      if (["node_modules", "_work", "_archive"].includes(e.name)) continue;
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) walk(p); else if (e.name.endsWith(".js")) files.push(p);
+    }
+  };
   walk(KIT);
   let syn = 0;
   for (const f of files) {
@@ -40,22 +47,51 @@ function runCheck() {
 
   console.log("\nPackages");
   const VIDEO = { "ffmpeg-static": "^5.3.0", "ffprobe-static": "^3.1.0" };
-  for (const [name, want, video] of [...Object.entries(pkg.dependencies).filter(([n]) => !VIDEO[n]).map(([n, v]) => [n, v, false]), ...Object.entries(VIDEO).map(([n, v]) => [n, v, true])]) {
+  for (const [name, want, video] of [
+    ...Object.entries(pkg.dependencies).filter(([n]) => !VIDEO[n]).map(([n, v]) => [n, v, false]),
+    ...Object.entries(VIDEO).map(([n, v]) => [n, v, true]),
+  ]) {
     const pj = path.join(KIT, "node_modules", name, "package.json");
-    if (!fs.existsSync(pj)) { (video ? warn : no)(name + " not installed" + (video ? " (video tools only: npm run add-video in the kit folder)" : ". Run  npm install  in " + KIT)); continue; }
+    if (!fs.existsSync(pj)) {
+      (video ? warn : no)(name + " not installed" + (video ? " (video tools only: npm run add-video in the kit folder)" : ". Run  npm install  in " + KIT));
+      continue;
+    }
     const v = JSON.parse(fs.readFileSync(pj, "utf8")).version;
     ok(name + " " + v + " (wants " + want + ")");
   }
-  try { require(path.join(KIT, "node_modules", "sharp")); ok("sharp loads (native image library present)"); } catch (e) { no("sharp does not load: " + e.message.split("\n")[0]); }
-
-  console.log("\nWord render (Windows only)");
-  if (process.platform !== "win32") warn("not Windows: Word renders and proofing are off; build and QA still work");
-  else {
-    const r = spawnSync("powershell.exe", ["-NoProfile", "-Command", "if (Test-Path 'Registry::HKEY_CLASSES_ROOT\\Word.Application') { 'word' } else { 'none' }"], { encoding: "utf8", timeout: 30000, windowsHide: true });
-    if (r.error) no("powershell.exe not found: " + r.error.message);
-    else if (/word/.test(r.stdout)) ok("powershell.exe and Word (COM) found");
-    else no("Word is not registered for COM. Renders need desktop Word.");
+  try {
+    require(path.join(KIT, "node_modules", "sharp"));
+    ok("sharp loads (native image library present)");
+  } catch (e) {
+    no("sharp does not load: " + e.message.split("\n")[0]);
   }
+  try {
+    const canvas = require(path.join(KIT, "node_modules", "@napi-rs", "canvas"));
+    if (typeof canvas.createCanvas !== "function") throw new Error("createCanvas missing");
+    canvas.createCanvas(1, 1);
+    ok("@napi-rs/canvas loads (native Skia canvas present)");
+  } catch (e) {
+    no("@napi-rs/canvas does not load: " + e.message.split("\n")[0]);
+  }
+  try {
+    const pdfjsEntry = path.join(KIT, "node_modules", "pdfjs-dist", "legacy", "build", "pdf.mjs");
+    const pdfjs = await import(pathToFileURL(pdfjsEntry).href);
+    if (typeof pdfjs.getDocument !== "function") throw new Error("getDocument missing");
+    ok("pdfjs-dist loads (pure-Node PDF rasterizer ready)");
+  } catch (e) {
+    no("pdfjs-dist does not load: " + e.message.split("\n")[0]);
+  }
+
+  console.log("\nRenderer (DOCX to PDF)");
+  const renderer = discoverRenderer({ kitDir: KIT, ...(opts.discoverOpts || {}) });
+  if (renderer.kind === "libreoffice") {
+    ok(renderer.label + " found (" + renderer.source + "): " + renderer.command);
+  } else if (renderer.kind === "word-com") {
+    ok(renderer.label + " found (LibreOffice not installed; Word will be used on Windows)");
+  } else {
+    warn(renderer.reason + " Build, QA, and proofing still work; renders need LibreOffice (no admin needed: Windows PortableApps, macOS ~/Applications, Linux AppImage).");
+  }
+
   console.log(bad ? "\nRESULT: " + bad + " problem(s)" : "\nRESULT: kit ready");
   return bad ? 1 : 0;
 }
@@ -63,5 +99,5 @@ function runCheck() {
 module.exports = { MIN_NODE_MAJOR, isSupportedNodeVersion, runCheck };
 
 if (require.main === module) {
-  process.exit(runCheck());
+  runCheck().then((code) => process.exit(code));
 }

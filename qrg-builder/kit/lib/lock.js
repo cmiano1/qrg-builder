@@ -1,5 +1,5 @@
 // lib/lock.js: a folder lock shared by every script and helper agent on this machine.
-//   render: one hidden Word at a time (Word COM renders, word_proof). Two at once can fail or leave WINWORD.EXE behind.
+//   render: one render at a time on this machine (LibreOffice headless or optional Windows Word COM fallback).
 //           Machine-wide: ~/.qrg_kit/render.lock (override with QRG_RENDER_LOCK, for example to share another
 //           project's render lock).
 //   build:  one live build, or one edit of a shared generator file, at a time per project: <project>/_work/_build.lock.
@@ -47,7 +47,12 @@ function acquire(kind, P) {
   }
   try { fs.writeFileSync(path.join(lock, "owner.txt"), "pid " + process.pid + " since " + new Date().toISOString() + ": " + process.argv.slice(1).join(" ").slice(0, 300)); } catch (e) { /* lock still held */ }
   let done = false;
-  const release = () => { if (done) return; done = true; try { fs.rmSync(lock, { recursive: true, force: true }); } catch (e) { /* already gone */ } };
+  const release = () => {
+    if (done) return;
+    done = true;
+    process.off("exit", release);
+    try { fs.rmSync(lock, { recursive: true, force: true }); } catch (e) { /* already gone */ }
+  };
   process.once("exit", release);
   return release;
 }
@@ -58,4 +63,10 @@ function withLock(kind, P, fn) {
   try { return fn(); } finally { release(); }
 }
 
-module.exports = { acquire, withLock, lockPath, heldEnv, sleep };
+// withLockAsync(kind, P, fn): hold the lock across an async fn and always release it.
+async function withLockAsync(kind, P, fn) {
+  const release = acquire(kind, P);
+  try { return await fn(); } finally { release(); }
+}
+
+module.exports = { acquire, withLock, withLockAsync, lockPath, heldEnv, sleep };

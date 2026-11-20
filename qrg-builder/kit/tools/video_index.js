@@ -31,14 +31,17 @@ const { PNG } = require('pngjs');
 
 let ffmpeg;
 let ffprobe;
-try {
-  ffmpeg = require('ffmpeg-static');
-  const fp = require('ffprobe-static');
-  ffprobe = fp.path || fp;
-} catch (err) {
-  console.error('ERROR: the video packages are not installed. In the kit folder run: npm run add-video');
-  console.error(err.message);
-  process.exit(2);
+function loadVideoBinaries() {
+  if (ffmpeg && ffprobe) return;
+  try {
+    ffmpeg = require('ffmpeg-static');
+    const fp = require('ffprobe-static');
+    ffprobe = fp.path || fp;
+  } catch (err) {
+    console.error('ERROR: the video packages are not installed. In the kit folder run: npm run add-video');
+    console.error(err.message);
+    process.exit(2);
+  }
 }
 
 function fail(msg, code = 1) {
@@ -116,6 +119,10 @@ function ensureOutput(outDir, overwrite) {
   fs.mkdirSync(path.join(outDir, 'frames'), { recursive: true });
 }
 
+function extractPtsTimes(stderr) {
+  return [...String(stderr || '').matchAll(/pts_time:([0-9.+-]+)/g)].map((m) => Number(m[1]));
+}
+
 function extractCandidates(video, outDir, opts, meta) {
   const pattern = path.join(outDir, 'frames', 'frame-%04d.png');
   let selector;
@@ -138,10 +145,7 @@ function extractCandidates(video, outDir, opts, meta) {
   const r = run(ffmpeg, args);
   if (r.status !== 0) fail(`ffmpeg candidate extraction failed:\n${r.stderr}`);
 
-  const times = [];
-  const re = /pts_time:([0-9.+-]+)/g;
-  let m;
-  while ((m = re.exec(r.stderr)) !== null) times.push(Number(m[1]));
+  const times = extractPtsTimes(r.stderr);
 
   let files = fs.readdirSync(path.join(outDir, 'frames')).filter(f => /^frame-\d+\.png$/i.test(f)).sort();
   if (opts.mode === 'scene' && files.length > opts.max) {
@@ -198,6 +202,7 @@ function buildSheet(outDir, items, columns) {
 }
 
 function main() {
+  loadVideoBinaries();
   const opts = parseArgs(process.argv.slice(2));
   if (!opts.video || !opts.out) { usage(); process.exit(2); }
   const video = path.resolve(opts.video);
@@ -240,4 +245,8 @@ function main() {
   console.log(`Manifest: ${path.join(outDir, 'index.md')}`);
 }
 
-main();
+module.exports = { extractPtsTimes, formatTime, parseArgs };
+
+if (require.main === module) {
+  main();
+}

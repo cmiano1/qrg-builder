@@ -31,7 +31,7 @@ user ("asdf", "Test Test") when a better frame exists.
 
 ## 3. Cropping
 
-- **Crop off:** browser tabs and address bar, the Windows taskbar, meeting controls, video tiles, and admin banners.
+- **Crop off:** browser tabs and address bar, the OS taskbar or dock, meeting controls, video tiles, and admin banners.
 - **Do not overcrop.** The reader needs to know where they are. The first figure of a page is an establishing
   view (most of the page); later figures can be tighter.
 - **Wide, shallow screens** (a toolbar, a long row of fields) shrink until the text cannot be read when shown at
@@ -46,7 +46,7 @@ user ("asdf", "Test Test") when a better frame exists.
 
 ## 4. Boxes and badges
 
-- A red box on what to click, with a numbered badge. **Badge number = step number.**
+- A brand-accent box (`palette.accent` from `qrg.config.json`, red by default) on what to click, with a numbered badge. **Badge number = step number.**
 - Put `"badgeIn": 0.24` and `"guide": "../../guides/NN.js"` in every `annotate.json`. Then every badge prints at
   the same size across the guide, and small crops are upscaled so edges stay sharp. Re-run the whole manifest after
   any change, so all figures in the guide match.

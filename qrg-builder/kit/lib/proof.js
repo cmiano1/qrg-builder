@@ -109,9 +109,12 @@ function mapLintKind(lintKind) {
 
 async function loadHarper() {
   const harper = await import("harper.js");
-  const { binary } = await import("harper.js/binary");
+  // Load binaryInlined (data: URL) instead of harper.js/binary: upstream harper.js@3.2.0
+  // calls fs.readFile(new URL(binary).pathname) without fileURLToPath(), which fails with
+  // ENOENT on paths containing spaces (%20) and on Windows drive-letter paths (/C:/...).
+  const { binaryInlined: binary } = await import("harper.js/binaryInlined");
   if (!harper || !harper.LocalLinter || !harper.Dialect || !binary) {
-    throw new Error("harper.js did not expose LocalLinter, Dialect, and binary");
+    throw new Error("harper.js did not expose LocalLinter, Dialect, and binaryInlined");
   }
   return { harper, binary };
 }

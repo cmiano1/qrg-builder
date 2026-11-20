@@ -49,8 +49,9 @@ async function runCheck() {
   try { require(path.join(KIT, "node_modules", "sharp")); ok("sharp loads (native image library present)"); } catch (e) { no("sharp does not load: " + e.message.split("\n")[0]); }
   try {
     const harper = await import("harper.js");
-    const { binary } = await import("harper.js/binary");
-    if (!harper.LocalLinter || !binary) throw new Error("missing LocalLinter or binary export");
+    // Use binaryInlined (data: URL) so paths with spaces (%20) and Windows drive letters work reliably.
+    const { binaryInlined: binary } = await import("harper.js/binaryInlined");
+    if (!harper.LocalLinter || !binary) throw new Error("missing LocalLinter or binaryInlined export");
     const linter = new harper.LocalLinter({ binary, dialect: harper.Dialect.American });
     try {
       await linter.setup();

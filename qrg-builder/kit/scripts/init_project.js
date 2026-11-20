@@ -128,6 +128,12 @@ write("qa_names.txt", [
   "# Lines starting with # are ignored.",
   "",
 ].join("\n"));
+write("qa_dictionary.txt", [
+  "# Approved words for offline proofing (one word or UI label per line).",
+  "# Add product names, acronyms, and screen labels so proof_guides.js does not flag them.",
+  "# Lines starting with # are ignored.",
+  "",
+].join("\n"));
 const today = new Date(), mdY = String(today.getMonth() + 1).padStart(2, "0") + "/" + String(today.getDate()).padStart(2, "0") + "/" + today.getFullYear();
 const K = KITMODE === "copy" ? "qrg_kit" : SKILL_KIT.replace(/\\/g, "/");
 write("_QRG - state.md", [

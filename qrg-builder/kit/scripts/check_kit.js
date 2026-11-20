@@ -13,7 +13,7 @@ function isSupportedNodeVersion(version = process.versions.node) {
   return Number.isFinite(major) && major >= MIN_NODE_MAJOR;
 }
 
-function runCheck() {
+async function runCheck() {
   let bad = 0;
   const ok = (m) => console.log("  ok   " + m), no = (m) => { bad++; console.log("  FAIL " + m); }, warn = (m) => console.log("  warn " + m);
 
@@ -47,9 +47,23 @@ function runCheck() {
     ok(name + " " + v + " (wants " + want + ")");
   }
   try { require(path.join(KIT, "node_modules", "sharp")); ok("sharp loads (native image library present)"); } catch (e) { no("sharp does not load: " + e.message.split("\n")[0]); }
+  try {
+    const harper = await import("harper.js");
+    const { binary } = await import("harper.js/binary");
+    if (!harper.LocalLinter || !binary) throw new Error("missing LocalLinter or binary export");
+    const linter = new harper.LocalLinter({ binary, dialect: harper.Dialect.American });
+    try {
+      await linter.setup();
+    } finally {
+      await linter.dispose();
+    }
+    ok("harper.js loads (offline spelling and grammar proofing ready)");
+  } catch (e) {
+    no("harper.js does not load: " + String(e && e.message ? e.message : e).split("\n")[0]);
+  }
 
   console.log("\nWord render (Windows only)");
-  if (process.platform !== "win32") warn("not Windows: Word renders and proofing are off; build and QA still work");
+  if (process.platform !== "win32") warn("not Windows: Word renders are off; build, QA, and offline proofing work");
   else {
     const r = spawnSync("powershell.exe", ["-NoProfile", "-Command", "if (Test-Path 'Registry::HKEY_CLASSES_ROOT\\Word.Application') { 'word' } else { 'none' }"], { encoding: "utf8", timeout: 30000, windowsHide: true });
     if (r.error) no("powershell.exe not found: " + r.error.message);
@@ -63,5 +77,8 @@ function runCheck() {
 module.exports = { MIN_NODE_MAJOR, isSupportedNodeVersion, runCheck };
 
 if (require.main === module) {
-  process.exit(runCheck());
+  runCheck().then((code) => process.exit(code), (err) => {
+    console.error(err);
+    process.exit(1);
+  });
 }

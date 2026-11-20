@@ -38,7 +38,9 @@ Each item captures a trap already encountered, paired with the working pattern. 
   `InvokeMember` with two arguments (`[string]` path and `[int]17`) so Word does not hang. Never kill `WINWORD.EXE` or
   desktop LibreOffice while a user may have open documents.
 - **Offline proofing (`harper.js`) is a mechanical floor:** it catches real typos and grammar slips offline without
-  Word, and respects approved client UI labels and acronyms in `qa_dictionary.txt`. Always read `_work/qa_text_NN.txt`
+  Word, and respects approved client UI labels and acronyms in `qa_dictionary.txt`. Load the WASM binary via
+  `harper.js/binaryInlined` (not `harper.js/binary`, whose `new URL(binary).pathname` loader breaks on folder paths with
+  spaces and Windows drive letters). Always read `_work/qa_text_NN.txt`
   to check meaning, clarity, and factual accuracy.
 - **A build stops if the prior build is open in Word or LibreOffice** (the OS blocks moving it to `_archive/`). Ask the
   user to close it first.

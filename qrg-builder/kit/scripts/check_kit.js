@@ -38,12 +38,26 @@ async function runCheck(opts = {}) {
   };
   walk(KIT);
   let syn = 0;
+  let escBad = 0;
+  const EN_DASH = String.fromCharCode(0x2013);
+  const EM_DASH = String.fromCharCode(0x2014);
+  const U_ESC_RE = new RegExp(String.fromCharCode(0x5c, 0x5c) + "u[0-9a-fA-F]{4}");
   for (const f of files) {
     const r = spawnSync(process.execPath, ["--check", f], { encoding: "utf8" });
     if (r.status !== 0) no(path.relative(KIT, f) + ": " + (r.stderr || "").split("\n").slice(0, 4).join(" "));
     else syn++;
+    const src = fs.readFileSync(f, "utf8");
+    if (src.includes(EN_DASH) || src.includes(EM_DASH)) {
+      escBad++;
+      no(path.relative(KIT, f) + ": contains em or en dash (use plain hyphen or String.fromCharCode)");
+    }
+    if (U_ESC_RE.test(src)) {
+      escBad++;
+      no(path.relative(KIT, f) + ": contains literal unicode hex escape (use String.fromCharCode)");
+    }
   }
   ok(syn + " of " + files.length + " scripts pass node --check");
+  if (!escBad) ok("0 scripts contain em/en dashes or literal unicode escapes");
 
   console.log("\nPackages");
   const VIDEO = { "ffmpeg-static": "^5.3.0", "ffprobe-static": "^3.1.0" };

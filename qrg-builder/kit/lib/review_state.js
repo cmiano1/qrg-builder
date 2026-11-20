@@ -68,20 +68,37 @@ function canPick(guide) {
   return Boolean(guide && guide.lockStatus === "locked");
 }
 
+function applyDecisionToGuide(guide, patch = {}, opts = {}) {
+  let nextCall = guide.call;
+  let nextComment = guide.comment;
+  let lastEvent = "";
+
+  if (patch.call !== undefined) {
+    const normalized = patch.call == null ? "" : String(patch.call);
+    if (normalized !== "" && !CALLS.includes(normalized)) {
+      throw new RangeError("Unrecognized review call: " + JSON.stringify(normalized));
+    }
+    const toggle = opts.toggle !== false;
+    nextCall = normalized === "" ? "" : toggle && guide.call === normalized ? "" : normalized;
+    lastEvent = nextCall ? 'Marked ' + guide.code + ' as "' + nextCall + '"' : "Cleared pick on " + guide.code;
+  }
+
+  if (patch.comment !== undefined) {
+    nextComment = patch.comment == null ? "" : String(patch.comment);
+    if (!lastEvent) lastEvent = "Saved reviewer comment on " + guide.code;
+  }
+
+  return { nextCall, nextComment, lastEvent };
+}
+
 function setPick(state, code, call) {
   if (!state || !Array.isArray(state.guides)) return state;
   const g = state.guides.find((x) => x.code === code);
   if (!g || !canPick(g)) return state;
-  const normalized = call == null ? "" : String(call);
-  if (normalized !== "" && !CALLS.includes(normalized)) {
-    throw new RangeError("Unrecognized review call: " + JSON.stringify(normalized));
-  }
-  const nextCall = normalized === "" ? "" : g.call === normalized ? "" : normalized;
+  const { nextCall, lastEvent } = applyDecisionToGuide(g, { call });
   return {
     ...state,
-    lastEvent: nextCall
-      ? 'Marked ' + code + ' as "' + nextCall + '"'
-      : "Cleared pick on " + code,
+    lastEvent,
     guides: state.guides.map((x) =>
       x.code === code ? { ...x, call: nextCall } : x
     ),
@@ -92,12 +109,12 @@ function setComment(state, code, comment) {
   if (!state || !Array.isArray(state.guides)) return state;
   const g = state.guides.find((x) => x.code === code);
   if (!g) return state;
-  const verbatim = comment == null ? "" : String(comment);
+  const { nextComment, lastEvent } = applyDecisionToGuide(g, { comment });
   return {
     ...state,
-    lastEvent: "Saved reviewer comment on " + code,
+    lastEvent,
     guides: state.guides.map((x) =>
-      x.code === code ? { ...x, comment: verbatim } : x
+      x.code === code ? { ...x, comment: nextComment } : x
     ),
   };
 }
@@ -804,29 +821,21 @@ async function recordGuideDecision(P, code, patch = {}, opts = {}) {
     };
   }
 
-  let nextCall = cur.call;
-  let nextComment = cur.comment;
-  let lastEvent = "";
-
-  if (patch.call !== undefined) {
-    const normalized = patch.call == null ? "" : String(patch.call);
-    if (normalized !== "" && !CALLS.includes(normalized)) {
+  let decision;
+  try {
+    decision = applyDecisionToGuide(cur, patch, opts);
+  } catch (err) {
+    if (err instanceof RangeError) {
       return {
         ok: false,
         statusCode: 400,
-        error: "Unrecognized review call: " + JSON.stringify(normalized),
+        error: err.message,
         state,
       };
     }
-    const toggle = opts.toggle !== false;
-    nextCall = normalized === "" ? "" : toggle && cur.call === normalized ? "" : normalized;
-    lastEvent = nextCall ? 'Marked ' + code + ' as "' + nextCall + '"' : "Cleared pick on " + code;
+    throw err;
   }
-
-  if (patch.comment !== undefined) {
-    nextComment = patch.comment == null ? "" : String(patch.comment);
-    if (!lastEvent) lastEvent = "Saved reviewer comment on " + code;
-  }
+  const { nextCall, nextComment, lastEvent } = decision;
 
   const stored = readReviewState(P);
   const prevRec = stored.guides[code] || {};

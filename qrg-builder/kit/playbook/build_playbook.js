@@ -1,9 +1,9 @@
 // build_playbook.js: builds the QRG Playbook, a Word guide to the team's QRG process for consultants, change managers,
 // and reviewers who do not read code. It uses the same house-style helpers as the guides (lib/docx_helpers.js), so it
-// is Google-safe in the same ways: real headings, fixed-width tables, real tabs, alt text, one body font.
+// is Google-safe in the same ways: real headings, fixed-width tables, real tabs, alt text, US Letter margins.
 // The generator is the master. Do not hand-edit the built file; change this script and rebuild.
 // Usage (from anywhere):
-//   node build_playbook.js ["<out folder>"] [--status=DRAFT]
+//   node build_playbook.js ["<out folder>"] [--out="<file.docx>"] [--status=DRAFT]
 // Output: "<out folder>/QRG Playbook - <STATUS> <YYYYMMDD-HHMM>.docx" (default out folder: the current folder).
 // Pictures: playbook/assets/example_page_01.png and _02.png are the two rendered pages of the worked example guide
 // (scripts/new_guide.js --example). Rebuild them only if the example guide changes.
@@ -17,6 +17,7 @@ const KIT = path.resolve(__dirname, "..");
 const KIT_VERSION = JSON.parse(fs.readFileSync(path.join(KIT, "package.json"), "utf8")).version;
 const STATUS = arg("status") || "DRAFT";
 if (!/^[A-Z]+$/.test(STATUS)) { console.error("STOP: --status must be capital letters"); process.exit(2); }
+const OUT_FILE = arg("out");
 const OUT_DIR = path.resolve(process.argv.slice(2).find((a) => !a.startsWith("--")) || ".");
 const ASSETS = path.join(__dirname, "assets");
 const DOT = String.fromCharCode(0xB7); // middle dot, as in the guide footers
@@ -49,17 +50,19 @@ function body() {
 
   // 1
   b.push(sec("What this playbook covers"));
-  b.push(para("A Quick Reference Guide (QRG) is a short Word job aid for one task, for one role in one unit. A reader "
-    + "keeps it open beside the system and follows it step by step. This playbook explains how the team makes QRGs so "
-    + "that every guide reads the same way, every step is accurate, and the reviewer reads each version once."));
-  b.push(para("The process runs on two things: the **qrg-builder** skill for Claude Code (instructions Claude follows) "
-    + "and the **QRG kit** (Node scripts that build, check, render, and release the guides). You can run the whole "
-    + "process with Claude Code, or run each command yourself."));
+  b.push(para("A Quick Reference Guide (QRG) is a short, evergreen, Standard US Letter Word guide for one task, for one "
+    + "role in one unit. A reader keeps it open beside the system and follows it step by step. This playbook explains "
+    + "how the team makes QRGs so that every guide reads the same way, every step is accurate, and the reviewer reads "
+    + "each version once."));
+  b.push(para("The process runs on two things: the **qrg-builder** Skill (instructions followed by Claude Code, "
+    + "Antigravity, Codex, or Cursor) and the **QRG Kit** (cross-platform Node.js scripts that build, check, proof, "
+    + "render, review, and stage guides on Windows, macOS, and Linux without requiring paid Microsoft Office). Use the "
+    + "companion 2-page Quick-Start QRG (**Make QRGs with the QRG Builder Skill**) as a desk cheat sheet."));
   b.push(refTable(["Part", "What it is for"], [
     ["Sections 2 to 4", "Why the process works the way it does, who does what, and the end-to-end flow"],
-    ["Sections 5 to 8", "What a finished guide looks like, and the writing, screenshot, and evidence rules"],
-    ["Section 9", "The review gate: lock, OK List, fix rounds, send copies"],
-    ["Sections 10 to 12", "Setting up, starting a new project, and working with Claude Code"],
+    ["Sections 5 to 8", "What a finished QRG looks like, and the writing, screenshot, and evidence rules"],
+    ["Section 9", "The review gate: Review Lock, Browser Review UI and OK List, fix rounds, Send Copies"],
+    ["Sections 10 to 12", "Cross-platform setup (zip or Git, no-admin LibreOffice), starting a project, and using any AI tool or CLI"],
     ["Sections 13 and 14", "Fixing common problems, and where to find the full rules"],
   ], [2600, 6760]));
 
@@ -81,50 +84,53 @@ function body() {
   b.push(callout("Guides are not a substitute for Awareness and Desire. Before the first guides go out, confirm with the "
     + "change lead that the why-message and the leader messages have landed.", "warn"));
   b.push(h3("The three things the rules protect"));
-  b.push(bullet("**Trust.** Readers follow a guide literally. One wrong step makes them doubt every other guide. So a "
+  b.push(bullet("**Trust.** Readers follow a QRG literally. One wrong step makes them doubt every other guide. So a "
     + "step goes in only when it was shown on screen or stated by the process owner, and a gap is left out and logged "
     + "as a question, never guessed."));
-  b.push(bullet("**Reviewer time.** Reviewers are often busy client leads. The lock and the OK List make each "
-    + "version one exact file, so the reviewer reads it once, and any change after an OK is visible."));
-  b.push(bullet("**Life after go-live.** Guides stay in use long after training ends. So they carry no session "
-    + "references, names, or dates, and they never point at other guides by title (titles change)."));
+  b.push(bullet("**Reviewer time.** Reviewers are often busy client leads. The Review Lock and dual review surfaces "
+    + "(Local Browser Review UI and .xlsx OK List) tie each decision to one exact SHA-256 build, so unchanged guides "
+    + "carry forward and only real changes need rereading."));
+  b.push(bullet("**Life after go-live.** QRGs stay in use long after training ends. So they carry zero dates, zero "
+    + "people's names, zero session references, and zero cross-references to other guides by title (titles change)."));
   b.push(h3("Systems effects to watch"));
-  b.push(bullet("A fix in one unit's guide usually applies to the same guide in the other units. The rule is the same "
-    + "fix everywhere, except guides that are frozen (under review or already sent), which go on the next round's list."));
+  b.push(bullet("A fix in one Set's QRG usually applies to the matching QRG in sibling Sets. Make the same fix "
+    + "everywhere except frozen guides (already approved and staged), which go on the next round's list."));
   b.push(bullet("A reviewer's comment often states a general rule (\"markers stay in their own section\"). Apply it to "
     + "every guide you touch, and add it to the project's rules so the next guide starts right."));
-  b.push(bullet("A hand edit in a Word file is lost at the next build, or blocks it. That is why the generator is the "
-    + "master and reviewers comment on the OK List instead of in Word."));
+  b.push(bullet("A hand edit in a built Word file is lost at the next build, or blocks it. That is why the Guide Source "
+    + "is master and reviewers record comments in the Browser Review UI or OK List instead of in Word."));
 
   // 3
   b.push(sec("Roles"));
   b.push(refTable(["Role", "Usually", "Does", "Does not"], [
-    ["Builder", "A consultant, often with Claude Code", "Gathers evidence, writes guides, makes screenshots, builds, checks, renders, reads every page, logs questions", "Lock guides or make send copies"],
-    ["Lead", "One person (or one Claude session) per project", "Locks guides, builds the OK List, makes send copies, keeps the state file current", "Give the OK to send"],
+    ["Builder", "A consultant, often with an AI coding assistant", "Gathers evidence, writes Guide Sources, annotates screenshots, builds, runs QA and proofing, renders, inspects pages, logs questions", "Lock guides or stage Send Copies"],
+    ["Lead", "One person (or one lead session) per project", "Applies Review Locks, opens or exports the OK List, stages Send Copies, keeps the state file current", "Give the OK to send"],
     ["Process owner", "Client business owner", "Answers scope and process questions, settles conflicts between sources", "Format or proof guides"],
-    ["Reviewer", "Change manager or client reviewer", "Reads each locked PDF, picks a call and comments on the OK List", "Edit the Word files"],
-    ["Publisher", "A person on the team", "Moves send copies to the shared or client location", "Skip the gate"],
-    ["Claude Code", "Assistant to the builder and lead", "Runs the loop, drafts, checks, reports, asks questions", "Publish, send email, or write to cloud folders"],
-  ], [1500, 2200, 3700, 1960]));
+    ["Reviewer", "Change manager or client reviewer", "Inspects rendered pages in the Browser Review UI or .xlsx OK List and records calls and comments", "Edit the built Word files"],
+    ["Publisher", "A person on the team", "Delivers staged Send Copies from _send/ to the shared or client location", "Skip the review gate"],
+    ["AI assistant (optional)", "Claude Code, Antigravity, Codex, or Cursor", "Follows SKILL.md, runs Kit commands, reviews extracted text for clarity, reports findings", "Publish, send email, or write to cloud folders"],
+  ], [1550, 2250, 3600, 1960]));
 
   // 4
   b.push(sec("The flow, end to end"));
   b.push(para("Each stage has a gate. Work moves on only when the gate is met.", { keepNext: true }));
   b.push(refTable(["Stage", "What happens", "Output", "Gate"], [
-    ["1. Scope", "Task list per role and unit, out-of-scope list, and the screenshot privacy rule", "Unit addendum", "Process owner agrees the task list"],
-    ["2. Evidence", "Captions searched, frames pulled and checked, process owner answers", "A brief per guide, questions by who answers", "Every step is shown or stated"],
-    ["3. Draft", "Guide file, marked screenshots, scratch build, automated QA, Word render", "Scratch Word file, page images", "QA clean, every page read"],
-    ["4. Live build", "Build, QA, Word proof, clean scan, render", "Live Word file and PDF", "Definition of done met"],
-    ["5. Lock", "The lead records the exact file (its SHA-256 fingerprint) and how this version was reached", "Lock record", "The lock refuses anything unchecked"],
-    ["6. OK List", "The reviewer reads each PDF and picks a call", "OK List workbook", "The reviewer's call"],
-    ["7. Fix round", "Every comment handled, guides rebuilt, relocked, new OK List", "New OK List", "Back to stage 5"],
-    ["8. Send copies", "Clean-named copies of guides picked OK whose file still matches its lock", "Local send folder and manifest", "File unchanged since its lock"],
-    ["9. Publish", "A person moves the copies to the shared or client location", "Delivered guides", "People only"],
+    ["1. Scope", "Task list per Set, out-of-scope list, brand accent color, and screenshot privacy rule", "Unit addendum and config", "Process owner agrees the task list"],
+    ["2. Evidence", "Captions searched, frames pulled and verified, process owner answers", "Brief per QRG, questions by owner", "Every step is shown or stated"],
+    ["3. Draft", "Guide Source, annotated screenshots, scratch build, automated QA, LibreOffice Render", "Scratch .docx, US Letter PNGs", "QA clean, every page inspected"],
+    ["4. Live build", "Build, QA, offline proofing (harper.js + qa_dictionary.txt), AI clarity review, clean scan, Render", "Working Deliverable .docx, PDF, PNGs", "Definition of done met"],
+    ["5. Lock", "Lead records the live file's SHA-256 fingerprint, matching Render, and how this version was reached", "Review Lock record", "Lock refuses anything unchecked"],
+    ["6. Review", "Reviewer inspects US Letter pages in the Browser Review UI or .xlsx OK List and picks a call", "Saved picks or OK List sheet", "Reviewer's call recorded"],
+    ["7. Fix round", "Every comment handled, guides rebuilt, proofed, rendered, relocked, refreshed", "Updated review view or sheet", "Back to stage 5"],
+    ["8. Send Copies", "Clean-named Word (.docx) copies of OK'd, verified locks (+ optional PDFs when requested)", "Local _send/ folder and manifest", "SHA-256 unchanged since lock"],
+    ["9. Publish", "A person moves staged Send Copies to the shared or client location", "Delivered Final Deliverables", "People only"],
   ], [1450, 3610, 2200, 2100]));
 
   // 5
   b.push(sec("What a finished guide looks like"));
-  b.push(para("Every guide has the same six sections, in this order. The automated QA checks the order.", { keepNext: true }));
+  b.push(para("Every QRG is strictly Standard US Letter (8.5 x 11 in, 1 in margins, 6.5 in content width, Calibri font "
+    + "for Google Docs and LibreOffice Carlito parity) with the same six sections in order. Automated QA enforces the "
+    + "page size and section order.", { keepNext: true }));
   b.push(refTable(["Section", "What goes there"], [
     ["Purpose", "One or two sentences: what the task is and why the reader does it"],
     ["Who does this", "**Who:** the role. **When:** the trigger that tells the reader it is time"],
@@ -133,12 +139,12 @@ function body() {
     ["What happens next", "What the reader sees when it worked, and what happens downstream"],
     ["Troubleshooting", "A two-column table: the situation the reader sees, and what to do"],
   ], [2400, 6960]));
-  b.push(para("The two pages below are the worked example that comes with the kit. Its screen is a drawing made by "
-    + "the kit, not a real system, so it can be shared freely.", { keepNext: true }));
+  b.push(para("The two pages below are the worked example that ships with the Kit. Its screen is drawn by the Kit "
+    + "rather than captured from a real client system, so it can be shared freely.", { keepNext: true }));
   b.push(...afig(ASSETS, "example_page_01.png", "Figure 1. Page 1 of the example guide: title block, the first three sections, and the first steps with a marked screenshot", 5.0));
   b.push(bullet("The badge numbers on the screenshot match the step numbers, and the caption names those steps."));
   b.push(bullet("On-screen labels are bold and spelled exactly as the screen shows them."));
-  b.push(bullet("The footer carries the guide title and the unit, and the page number at the right margin."));
+  b.push(bullet("The footer carries the guide title and the Set tag, and the page number at the right margin."));
   b.push(...afig(ASSETS, "example_page_02.png", "Figure 2. Page 2 of the example guide: more steps, a TIP, What happens next, and Troubleshooting", 5.0));
   b.push(bullet("The step list continues from page 1 (steps 3 to 5); it does not restart under each heading."));
   b.push(bullet("The figure only marks steps from its own section, and sits right after them."));
@@ -146,34 +152,34 @@ function body() {
 
   // 6
   b.push(sec("Writing rules, short version"));
-  b.push(para("The full rules, with the reason for each, are in the skill's content rules. These are the ones reviewers "
+  b.push(para("The full rules, with the reason for each, are in the Skill's content rules. These are the ones reviewers "
     + "flag most.", { keepNext: true }));
   b.push(num("**Facts only.** A step goes in only when it is shown or stated. Unconfirmed steps are left out and logged with a question, never hedged (no TBD, \"check with\", or \"probably\").", "steps"));
   b.push(num("**One click, one step.** A short imperative: \"Click **Save**.\" \"In **Status**, select **Closed**.\"", "steps"));
   b.push(num("**Bold the on-screen label,** spelled as the screen shows it. If the label looks wrong, keep it and raise a question.", "steps"));
   b.push(num("**One continuous step list** per guide. Badge numbers are step numbers.", "steps"));
-  b.push(num("**Evergreen.** No people's names, dates, session references, or guide numbers. Role names only.", "steps"));
+  b.push(num("**Evergreen text and date rule.** Zero dates inside QRGs (no \"Last updated\" line), zero people's names, zero session references, and zero guide numbers. Use MM/DD/YYYY dates only in work logs, briefs, and state files.", "steps"));
   b.push(num("**No cross-references** to other guides by title or number. Name the task in plain words instead.", "steps"));
   b.push(num("**Professional tone,** mostly third person, using the client's own names for apps, lists, and queues.", "steps"));
-  b.push(num("**House style.** American English, no em or en dashes, \"select\" and \"clear\" for check boxes, \"gray\" not \"grey\".", "steps"));
+  b.push(num("**House style.** American English, zero em or en dashes, \"select\" and \"clear\" for check boxes, \"gray\" not \"grey\".", "steps"));
   b.push(num("**Few callouts.** TIP for a shortcut, NOTE for a needed fact, IMPORTANT for harm or rework if missed.", "steps"));
-  b.push(num("**Unit fit.** Each unit's own names and content. The same fix goes into every unit's copy of a guide, except frozen ones.", "steps"));
-  b.push(callout("No invented process. If the system allows something the team does not want, the guide says so plainly "
-    + "and teaches the team rule, but only a rule the process owner or unit lead actually stated.", "note"));
+  b.push(num("**Unit fit.** Each Set's own names and content. The same fix goes into every Set's copy of a guide, except frozen ones.", "steps"));
+  b.push(callout("Offline proofing (harper.js + qa_dictionary.txt) catches mechanical spelling and grammar slips without "
+    + "Word, and reading _work/qa_text_NN.txt catches clarity or meaning gaps. Never skip reading the extracted text.", "note"));
 
   // 7
   b.push(sec("Screenshot rules, short version"));
-  b.push(bullet("**Coarse to fine.** Search the captions for the task, look at a short window of the recording, pull the exact frame, then look at it before you use it. Never use a contact-sheet tile as a figure."));
-  b.push(bullet("**Frame order.** Your own captures of the real system first, then recordings from the same unit and role, then another unit's screen only when no unit name or unit-only label shows."));
-  b.push(bullet("**Crop off** the browser bar, taskbar, meeting controls, chat, and admin banners. The first view of a page is a wide, establishing shot; later views can be tighter."));
-  b.push(bullet("**Wide, shallow screens** (a toolbar, a long row of fields) are not shrunk to page width. Use the kit's torn-edge cut-away to keep every control the steps name."));
-  b.push(bullet("**A red box and a numbered badge** on each click. All badges in a guide print at the same size."));
-  b.push(bullet("**Privacy is decided once per project** with the reviewer and written in the unit addendum. Redaction is a white box in the figure settings; source images are never edited. Real customer personal data never goes in a figure."));
+  b.push(bullet("**Coarse to fine.** Search the captions for the task, look at a short window of the recording, pull the exact frame, then inspect it before using it. Never use a contact-sheet tile as a figure."));
+  b.push(bullet("**Frame order.** Your own captures of the real system first, then recordings from the same Set and role, then another unit's screen only when no unit name or unit-only label shows."));
+  b.push(bullet("**Crop off** the browser bar, OS taskbar or dock, meeting controls, chat, and admin banners. The first view of a page is a wide, establishing shot; later views can be tighter."));
+  b.push(bullet("**Wide, shallow screens** (a toolbar, a long row of fields) are not shrunk to page width. Use the Kit's torn-edge cut-away to keep every control the steps name."));
+  b.push(bullet("**Brand-accent box and numbered badge** on each click (styled automatically from palette.accent in qrg.config.json, red by default). All badges in a guide print at uniform size across the 6.5 in US Letter width."));
+  b.push(bullet("**Privacy is decided once per project** with the reviewer and written in the unit addendum. Redaction is a white box in annotate.json; source images are never edited. Real customer personal data never goes in a figure."));
   b.push(bullet("**No source, no figure.** If no frame shows a click, write the step without a figure and log it for later. Never use a wrong screen."));
 
   // 8
   b.push(sec("Evidence and questions"));
-  b.push(para("Every claim in a guide has a known source, and every gap becomes a specific question to a named role.", { keepNext: true }));
+  b.push(para("Every claim in a QRG has a known source, and every gap becomes a specific question to a named role.", { keepNext: true }));
   b.push(refTable(["Label", "Means", "Example"], [
     ["Shown", "You looked at the frame, screenshot, or live screen yourself", "Recording part 2 at 01:12:40, frame checked"],
     ["Stated", "Words only: captions, transcript, the process owner's answer, meeting notes", "Process owner, written answer"],
@@ -181,7 +187,7 @@ function body() {
   ], [1500, 4300, 3560]));
   b.push(h3("When sources disagree"));
   b.push(para("Follow this order and log the conflict: (1) the process owner's decision, (2) the unit lead's or reviewer's "
-    + "comments, (3) real screens, newest first, (4) guides already approved for another unit, for shared screens only, "
+    + "comments, (3) real screens, newest first, (4) guides already approved for another Set, for shared screens only, "
     + "(5) older documents such as decks and design notes. A deck says what was planned; a recent screen shows what was "
     + "built. If the newest screen contradicts the process owner, ask."));
   b.push(h3("Questions"));
@@ -192,143 +198,145 @@ function body() {
 
   // 9
   b.push(sec("Review and release"));
-  b.push(para("The gate exists so the file the reviewer reads is the exact file that gets sent. Without it, a guide gets "
-    + "\"one more small fix\" after the OK, nobody rereads it, and the error ships under the reviewer's name."));
-  b.push(h3("Lock"));
-  b.push(para("The lead locks a guide after its pages were read. The lock records the file's SHA-256 fingerprint, its "
-    + "render, and a short note on how this version was reached (for example \"fix round 2: comments on steps 4 and 7\"). "
-    + "The lock refuses a file that has no render from that exact file, has a QA finding, was edited after it was "
-    + "built, or has tracked changes, comments, hidden text, or highlighting."));
-  b.push(h3("OK List"));
-  b.push(para("The OK List is an Excel workbook with one row per guide, a PDF link, a Word link, the lock note, and what "
-    + "to check first. Each row has a status:", { keepNext: true }));
-  b.push(refTable(["Status", "Means", "The reviewer"], [
-    ["Done, waiting for OK", "Locked, and the file is unchanged since its lock", "Reads the PDF and picks a call"],
-    ["Lock broken", "The file changed after it was locked", "Waits for a relock"],
-    ["Not locked", "Still being built or checked", "Skips it"],
-  ], [2400, 4000, 2960]));
-  b.push(para("The reviewer picks one call per row and can add a comment:", { keepNext: true }));
+  b.push(para("The gate ensures that the exact build the reviewer inspected is the exact Final Deliverable staged for "
+    + "delivery. Any edit after approval breaks the Review Lock visibly."));
+  b.push(h3("Review Lock"));
+  b.push(para("The lead locks a guide after its rendered pages are read. The lock records the live file's SHA-256 "
+    + "fingerprint, its matching Render PDF and page count, and a short --how note (for example \"fix round 2: comments "
+    + "on steps 4 and 7\"). Locking refuses any build with a missing or stale Render, a QA finding, a hand edit outside "
+    + "the build, or a clean-scan blocker (tracked changes, comments, hidden text, highlight, or yellow shading)."));
+  b.push(h3("Dual review surface: Browser Review UI and .xlsx OK List"));
+  b.push(para("Reviewers can approve guides in either the **Local Browser Review UI** (no Microsoft Excel required) or "
+    + "the **.xlsx OK List** workbook for external stakeholders. Both share the exact same SHA-256 Review Lock and "
+    + "carry-forward rules:", { keepNext: true }));
+  b.push(refTable(["Surface", "How to open", "Best for"], [
+    ["Local Browser Review UI", "Run node qrg_kit/scripts/review_ui.js (opens locally on 127.0.0.1 in Chrome, Edge, Safari, or Firefox)", "Reviewing US Letter pages side by side with zero spreadsheet software; picks and comments auto-save directly to review/ and can export .xlsx or stage Send Copies"],
+    [".xlsx OK List workbook", "Run node qrg_kit/scripts/build_ok_list.js (or click Export .xlsx OK List in the Browser Review UI)", "Sharing review progress with external clients or managers who expect Excel or Google Sheets"],
+  ], [2300, 3260, 3800]));
+  b.push(para("Every row shows a lock status and accepts one reviewer call:", { keepNext: true }));
   b.push(refTable(["Your call", "What happens"], [
-    ["OK to send", "A send copy is made"],
-    ["OK to send, note for later", "A send copy is made; the comment goes on the next round's list"],
-    ["Fix before sending", "The comment goes into a fix round; the guide comes back on a new OK List"],
+    ["OK to send", "Included when Send Copies are staged (only while the SHA-256 Review Lock matches)"],
+    ["OK to send, note for later", "Included in Send Copies; the comment goes on the next round's work log"],
+    ["Fix before sending", "Held back for a fix round; rebuilt guide returns blank with earlier comment displayed"],
   ], [3200, 6160]));
-  b.push(para("**Carry-forward.** Each new OK List copies the earlier calls and comments, but only for a guide whose "
-    + "locked file has not changed. A rebuilt guide comes back blank, marked as changed, with its earlier call shown, so "
-    + "the reviewer rereads it."));
-  b.push(callout("For the reviewer: work in the newest OK List only; save and close it before the next one is built (the "
-    + "script stops if it is open); comment in the sheet, not in the Word file.", "tip"));
+  b.push(para("**Carry-forward.** Unchanged locked guides keep their prior calls and comments across rounds. Any rebuilt "
+    + "guide resets to blank, flags **Changed since last sheet**, and displays the earlier call verbatim so the reviewer "
+    + "re-inspects what changed. Broken-lock and unlocked rows disable approval buttons."));
+  b.push(callout("Working in .xlsx? Always edit the newest OK List sheet, save and close Excel before rebuilding a new "
+    + "sheet, and comment in the OK List or Browser Review UI rather than inside the Word file.", "tip"));
   b.push(h3("Fix rounds"));
-  b.push(num("Copy the reviewer's comments out of the sheet word for word.", "steps2"));
-  b.push(num("Handle every comment: done, or skipped with a reason the reviewer will see. None is dropped.", "steps2"));
-  b.push(num("Make the same fix in the same guide in the other units, unless that guide is frozen.", "steps2"));
-  b.push(num("Where the reviewer gave new wording, keep the meaning and fix any typos.", "steps2"));
-  b.push(num("Rebuild, QA, render, read every page, relock with a note naming the round, and build a new OK List.", "steps2"));
-  b.push(h3("Send copies"));
-  b.push(para("Send copies are made only for guides picked OK to send whose file still matches its lock, and that are "
-    + "not on hold. Their names drop the guide number, status, and time stamp. They land in a local send folder with a "
-    + "manifest. An earlier copy the script made is moved aside, never deleted. Then a person moves the copies to the "
-    + "shared or client location. Claude Code never does this step."));
+  b.push(num("Read the reviewer's comments verbatim from the Browser Review UI or OK List.", "steps2"));
+  b.push(num("Handle every comment: complete it, or record a clear reason if deferred. None is dropped.", "steps2"));
+  b.push(num("Apply the same fix to matching guides in sibling Sets unless frozen.", "steps2"));
+  b.push(num("Rebuild, run QA and offline proofing, render, inspect every page PNG, relock with --how, and refresh.", "steps2"));
+  b.push(h3("Send Copies (Word default, optional matching PDF)"));
+  b.push(para("Send Copies are staged only for guides picked **OK to send** (or **OK to send, note for later**) whose "
+    + "SHA-256 still matches its Review Lock and that are not on hold. Clean names drop the guide number, status, and "
+    + "timestamp, landing locally in **_send/** with a manifest (prior Kit-made copies rotate safely into **_replaced/**). "
+    + "**Word (.docx) is staged by default.** Always ask before staging whether matching PDF copies from the exact "
+    + "locked Render are also needed; if yes, pass **--with-pdf** (or set **review.withPdf: true**, or check the PDF box "
+    + "in the Browser Review UI release modal). Then a person delivers the files by hand."));
 
   // 10
   b.push(sec("Setting up for the first time"));
   b.push(refTable(["You need", "Why"], [
-    ["Windows 10 or 11 with desktop Microsoft Word", "Word renders the guides to PDF and checks spelling and grammar"],
-    ["Git for Windows (Git Bash)", "The commands are written for Git Bash"],
-    ["Node.js 20 or newer", "Every kit script is Node"],
-    ["Claude Code (optional)", "Runs the process for you from plain requests"],
-  ], [4000, 5360]));
-  b.push(num("Get the skill zip (\"QRG Builder Skill - <stamp>.zip\") from a teammate. Save it in its own new, empty folder.", "steps3"));
-  b.push(num("Unzip it into the **.claude\\skills** folder in your Windows user folder, so you have **.claude\\skills\\qrg-builder**. Make the skills folder first if it is not there.", "steps3"));
-  b.push(num("In Git Bash, install the packages and run the health check. It should end with **RESULT: kit ready**.", "steps3", true));
-  b.push(...code(["cd ~/.claude/skills/qrg-builder/kit", "npm install", "npm run check"]));
-  b.push(callout("Never run npm install with --omit=optional. It drops the image library's Windows part, and screenshots "
-    + "stop working. The video tools are a separate, larger download (about 400 MB): npm run add-video, only if you will "
-    + "pull frames from recordings.", "warn"));
-  b.push(h3("Getting a newer kit"));
-  b.push(para("One person on the team owns the skill. When the kit changes, the owner raises its version number, packs a new "
-    + "zip (the pack step checks for dashes and for client and people's names first), and shares it. You rename your old "
-    + "**qrg-builder** folder, unzip the new one, and run **npm install** and **npm run check** again. Each project keeps the "
-    + "kit copy it was built with until you move it with **--upgrade-kit** (see the skill's setup notes). Rebuild one guide "
-    + "and compare it with its last build before you rebuild the rest."));
+    ["Windows 10/11, macOS, or Linux", "Every Kit script, QA check, offline proofer, PNG rasterizer, and Browser Review UI runs cross-platform"],
+    ["Node.js 22 or newer (LTS)", "Runs the Kit and its built-in test runner (verify with node --version)"],
+    ["LibreOffice (free, no admin needed)", "Converts .docx builds to PDF for visual Renders and optional PDF Send Copies (see below); optional Windows Word fallback if absent"],
+    ["AI coding tool (optional)", "Claude Code, Antigravity, Codex, or Cursor reads SKILL.md; standalone Node.js CLI works without any AI tool"],
+  ], [3700, 5660]));
+  b.push(h3("No-admin LibreOffice setup"));
+  b.push(bullet("**Windows:** unpack LibreOffice Portable (PortableApps) into your user folder (for example %USERPROFILE%\\LibreOfficePortable); the Kit auto-detects App\\libreoffice\\program\\soffice.com (or C:\\Program Files\\LibreOffice if installed)."));
+  b.push(bullet("**macOS:** drag LibreOffice.app from the .dmg into ~/Applications (no admin rights) or /Applications."));
+  b.push(bullet("**Linux:** place the LibreOffice AppImage in ~/Applications or ~/.local/bin and run chmod +x (if FUSE is missing, the Kit retries with --appimage-extract-and-run), or install libreoffice via your package manager."));
+  b.push(bullet("**Custom path:** set QRG_SOFFICE or render.soffice in qrg.config.json. Without LibreOffice, builds, QA, and proofing still succeed while Render prints a setup guide."));
+  b.push(h3("Install the Skill (zip or Git)"));
+  b.push(num("**Zip install:** get \"QRG Builder Skill - <stamp>.zip\" from a teammate and unzip the qrg-builder folder into your AI tool's skills folder (or any local folder for standalone CLI). **Git install:** clone the repository and point your AI tool at <repo>/qrg-builder.", "steps3"));
+  b.push(num("In any terminal (PowerShell, Command Prompt, macOS Terminal, or Linux shell), install packages inside <skill>/kit and run the health check until it prints **RESULT: kit ready**:", "steps3", true));
+  b.push(...code(["cd \"<skill>/kit\"", "npm install", "npm run check"]));
+  b.push(callout("Never pass --omit=optional to npm install: it drops platform native binaries for sharp and @napi-rs/canvas. "
+    + "Video frame tools are an optional add-on (about 400 MB): run npm run add-video inside the Kit folder only if needed.", "warn"));
+  b.push(h3("Getting a newer Kit"));
+  b.push(para("Pull the latest repository with **git pull** (Git install) or unpack a fresh Skill zip made with "
+    + "**pack_skill.js** (which checks every text file for em/en dashes and client words before zipping), then rerun "
+    + "**npm install** and **npm run check**. Each project stays on its own pinned **qrg_kit/** copy (with "
+    + "**package-lock.json**) until you upgrade it with **--upgrade-kit**."));
 
   // 11
   b.push(sec("Starting a new project"));
-  b.push(para("One command makes the project folder, its settings file, a copy of the kit, and the state and work-log "
-    + "files. It never overwrites anything that exists.", { keepNext: true }));
+  b.push(para("One cross-shell command creates the project folder, config file, pinned Kit copy, qa_names.txt, "
+    + "qa_dictionary.txt, and state and work-log files without overwriting anything existing.", { keepNext: true }));
   b.push(...code([
-    "node ~/.claude/skills/qrg-builder/kit/scripts/init_project.js \\",
-    "  --dir=\"C:/Users/<you>/Projects/<Client> QRGs\" --project=\"<Client>\" \\",
-    "  --set=UNIT1-INV --label=\"Unit 1 Investigator\" \\",
+    "node \"<skill>/kit/scripts/init_project.js\" --dir=\"<project folder>\" \\",
+    "  --project=\"<Client>\" --set=UNIT1-INV --label=\"Unit 1 Investigator\" \\",
     "  --unit-line=\"Unit 1 | Investigator\" --install",
   ]));
-  b.push(para("Then build the worked example once, to prove the setup end to end:", { keepNext: true }));
+  b.push(para("Build, check, proof, and render the worked example once to prove the whole pipeline end to end:", { keepNext: true }));
   b.push(...code([
-    "cd \"C:/Users/<you>/Projects/<Client> QRGs\"",
+    "cd \"<project folder>\"",
     "node qrg_kit/scripts/new_guide.js --set=UNIT1-INV --example",
-    "QRG_SCRATCH=1 QRG_ONLY=\"Unit 1 Investigator 01 \" \\",
-    "  node qrg_kit/build_qrgs.js --set=UNIT1-INV",
+    "node qrg_kit/build_qrgs.js --set=UNIT1-INV --scratch --only=\"Unit 1 Investigator 01 \"",
     "node qrg_kit/qa_qrgs.js --set=UNIT1-INV 01 --scratch",
-    "node qrg_kit/scripts/render_guides.js \\",
-    "  --file=\"sets/UNIT1-INV/_work/scratch/<the new .docx>\"",
+    "node qrg_kit/scripts/proof_guides.js \"sets/UNIT1-INV/_work/scratch/<the new .docx>\"",
+    "node qrg_kit/scripts/render_guides.js --file=\"sets/UNIT1-INV/_work/scratch/<the new .docx>\"",
   ]));
-  b.push(para("Open the page images in **_work/render_scratch** and look at them. Then delete the example guide (its guide file and its assets folder) before you write your real guide 01."));
+  b.push(para("Inspect the page PNGs in **_work/render_scratch/**, then delete the example guide before authoring guide 01."));
   b.push(h3("What you set per project"));
   b.push(refTable(["Setting", "Where", "Example"], [
-    ["Project name, sets (one per audience), file prefix, unit line, footer tag", "qrg.config.json", "Set UNIT1-INV, prefix \"Unit 1 Investigator\""],
-    ["People's names the guides must never contain", "qa_names.txt", "Every attendee and trainer name you see in the sources"],
-    ["Internal system names and code words to ban", "qrg.config.json, qa.extraBanned", "A project code name"],
-    ["Task list, out of scope, privacy rule, who answers what", "A unit addendum per set", "Copied from the skill's template"],
-  ], [3700, 2600, 3060]));
-  b.push(para("What you do not change per project: the six sections (unless the reviewer asks), the facts-only rule, and "
-    + "the review gate."));
+    ["Project name, Sets, prefix, unit line, footer tag, brand palette.accent", "qrg.config.json", "Set UNIT1-INV, accent \"1F5C99\" for headings, badges, Browser UI"],
+    ["People's names banned from QRGs", "qa_names.txt", "Every attendee, trainer, and staff name seen in sources"],
+    ["Approved client terms for offline proofing", "qa_dictionary.txt", "Client app names, acronyms, and screen button labels"],
+    ["Optional PDF default and custom LibreOffice path", "qrg.config.json", "review.withPdf (false default), render.soffice (null auto-detect)"],
+    ["Task list, out of scope, privacy rule, who answers what", "Unit addendum per Set", "Copied from references/unit_addendum_template.md"],
+  ], [3600, 2500, 3260]));
 
   // 12
-  b.push(sec("Working with Claude Code"));
-  b.push(para("Open Claude Code in the project folder and ask in plain words. Claude Code picks up the skill when a request "
-    + "mentions a QRG, a quick reference guide, a job aid, or a work instruction. If it does not, say \"use the qrg-builder skill\".", { keepNext: true }));
-  b.push(refTable(["You ask", "Claude Code does"], [
-    ["\"Set up a QRG project for Unit 2 Supervisors\"", "Runs the setup, adds the set, and reports what it made"],
-    ["\"Write QRG 03 from the part 2 recording, 01:10 to 01:25\"", "Searches the captions, pulls and checks frames, writes and builds the guide, runs every check, reads every page, and lists what it left out with questions"],
-    ["\"Lock the Unit 1 guides and build the OK List\"", "Checks each guide, locks the ones that pass, explains any refusal, and builds the sheet"],
-    ["\"Make the send copies\"", "Does a dry run first, makes the copies, and tells you where they are"],
-  ], [3700, 5660]));
-  b.push(h3("What the skill tells it not to do"));
-  b.push(bullet("Publish anything, send email, or write to Google Drive or any shared or client folder. Every file stays local until a person moves it."));
-  b.push(bullet("Guess a step. A step with no evidence is left out and comes back to you as a question."));
-  b.push(bullet("Hand-edit a built Word file, or rebuild over someone's hand edits without folding them into the guide file first."));
-  b.push(callout("These are instructions Claude Code follows, not a technical block. If your Claude Code can write to Google "
-    + "Drive, a shared folder, or email, read what it proposes before you approve it, or deny those tools in your Claude Code "
-    + "settings.", "note"));
-  b.push(para("For a large batch, Claude Code can split the work across several helper agents. Each helper gets the same "
-    + "written brief and its own list of guides; only the lead locks guides and builds the OK List."));
+  b.push(sec("Working with an AI coding tool (or standalone CLI)"));
+  b.push(para("Open Claude Code, Antigravity, Codex, or Cursor in the project folder and ask in plain English, or run "
+    + "the exact same Node commands directly from any terminal. If an AI tool does not load the Skill automatically, "
+    + "say \"use the qrg-builder skill\".", { keepNext: true }));
+  b.push(refTable(["You ask", "The AI tool does"], [
+    ["\"Set up a QRG project for Unit 2 Supervisors\"", "Runs init_project.js, adds the Set, and verifies check_kit.js"],
+    ["\"Write QRG 03 from the part 2 recording, 01:10 to 01:25\"", "Searches captions, pulls frames, annotates with brand accent, writes Guide Source, runs QA + offline proofing + clarity review, renders and inspects pages, logs gaps"],
+    ["\"Lock Unit 1 guides and open the Browser Review UI\"", "Verifies renders and QA, applies SHA-256 Review Locks, and starts review_ui.js on 127.0.0.1"],
+    ["\"Stage the Send Copies\"", "Asks whether matching PDF copies are also needed, runs make_send_copies.js --dry, stages into _send/, runs client_ready_scan.js, and stops for human delivery"],
+  ], [3600, 5760]));
+  b.push(h3("What the Skill tells every assistant not to do"));
+  b.push(bullet("Publish anything, send email, or write to Google Drive or any shared folder. Every file stays local until a person delivers it."));
+  b.push(bullet("Guess an unconfirmed step. Unconfirmed items stay out of QRGs and go into _QRG work log.md as questions."));
+  b.push(bullet("Hand-edit a built .docx, or bypass the hand-edit guard without folding edits into the Guide Source first."));
+  b.push(callout("Skill rules guide the AI assistant; they are not a system sandbox. If your AI tool has cloud drive or "
+    + "email tools enabled, review proposed actions before approving them or disable those tools in your tool settings.", "note"));
+  b.push(para("For large batches, a lead can dispatch parallel helper agents using references/agent_rules_template.md. "
+    + "Each helper owns specific Guide Sources; only the lead applies Review Locks, builds OK Lists, or stages Send Copies."));
 
   // 13
   b.push(sec("Troubleshooting"));
   b.push(refTable(["Situation", "What to do"], [
-    ["A script says the kit's packages are not installed", "Run **npm install** in the kit folder it names"],
-    ["Screenshots fail with a message about sharp", "Run **npm install** again without --omit=optional, then **npm run check**"],
-    ["The health check says Word is not registered for COM", "Install desktop Word. The web version cannot render"],
-    ["A render waits a long time", "Another render holds the Word lock. It frees itself when that run ends, or after 10 minutes if a run crashed"],
-    ["A build stops because the Word file was edited after it was built", "Someone edited the output. Compare it with the last build, fold the edits into the guide file, then rebuild"],
-    ["The OK List shows Lock broken", "The file changed after its lock. Read the new pages and relock before the reviewer picks"],
-    ["The reviewer commented in the Word file", "Copy the comments into the fix list, fix them in the guide file, rebuild. Never send the commented file"],
-    ["Two sources disagree on a step", "Follow the source order in section 8 (When sources disagree), log the conflict, and ask if the newest screen contradicts the process owner"],
-    ["No recording shows a click", "Write the step without a figure, log it as a later improvement, and add it to the watch list for the next session"],
+    ["A script says packages are not installed, or sharp / canvas fails", "Run plain npm install (never --omit=optional) inside the Kit folder named in the error, then npm run check"],
+    ["No DOCX-to-PDF renderer found", "Install no-admin LibreOffice (Windows PortableApps, macOS ~/Applications, or Linux AppImage) or set QRG_SOFFICE / render.soffice"],
+    ["Offline proofing flags valid client product names or UI labels", "Add each approved term on its own line in qa_dictionary.txt and rerun proof_guides.js"],
+    ["A render waits a long time", "Another Render holds the machine-wide render lock; it clears automatically when finished or after 10 minutes if stale"],
+    ["A build stops because the Word file was edited outside the build", "Diff the edited .docx against the last build, fold every change into guides/NN.js, then rebuild with --allow-rebuild-over-edits"],
+    ["The Browser Review UI or OK List shows Lock broken", "The live .docx changed after locking. Inspect the rendered pages and relock before approval"],
+    ["build_ok_list.js stops because a sheet is open in Excel", "Save and close the .xlsx workbook, or review in the Browser Review UI (review_ui.js) with zero Excel needed"],
+    ["Config validation rejects page \"a4\"", "Keep \"page\": \"letter\" in qrg.config.json; every QRG is Standard US Letter (8.5 x 11 in)"],
+    ["No source recording shows a click", "Write the step without a figure, log it as a later improvement, and add it to the watch list for the next session"],
   ], [3600, 5760]));
 
   // 14
   b.push(sec("Where to find more"));
-  b.push(refTable(["File (in the skill folder)", "Read it for"], [
-    ["SKILL.md", "The full process Claude Code follows, with every command"],
-    ["references/content_rules.md", "Every writing rule, with the reason for each"],
-    ["references/screenshot_rules.md", "Finding frames, cropping, boxes and badges, privacy"],
-    ["references/evidence_and_questions.md", "Shown or stated, source order, the left-out table, conflicts"],
-    ["references/definition_of_done.md", "The checklist a guide must pass before it is locked"],
-    ["references/review_and_release.md", "Lock, OK List, fix rounds, send copies, in detail"],
-    ["references/setup_for_teammates.md", "Setup step by step, including PowerShell use"],
-    ["references/lessons_learned.md", "Problems seen on real projects and how they were fixed"],
-    ["kit/README.md", "Every setting and every script option"],
+  b.push(refTable(["File (in the Skill folder)", "Read it for"], [
+    ["kit/playbook/build_quickstart_qrg.js", "Builds the 2-page Quick-Start QRG (\"Make QRGs with the QRG Builder Skill\")"],
+    ["SKILL.md", "The complete AI-tool-agnostic process and every Kit command"],
+    ["references/setup_for_teammates.md", "Step-by-step setup for Windows, macOS, Linux, zip/Git, and all AI tools"],
+    ["references/content_rules.md", "Every writing rule, including the evergreen zero-dates rule"],
+    ["references/screenshot_rules.md", "Finding frames, cropping, brand-accent boxes and badges, privacy"],
+    ["references/evidence_and_questions.md", "Shown vs. stated evidence, source order, left-out table, conflicts"],
+    ["references/definition_of_done.md", "The complete checklist a QRG must pass before applying a Review Lock"],
+    ["references/review_and_release.md", "Review Locks, Browser Review UI, .xlsx OK List, fix rounds, Word + optional PDF Send Copies"],
+    ["references/lessons_learned.md", "Cross-platform rendering, proofing, Google Docs, and recording traps already solved"],
+    ["kit/README.md and kit/tools/README.md", "Every qrg.config.json setting, Kit script option, and media/lint tool"],
   ], [3900, 5460]));
   return b;
 }
@@ -336,9 +344,15 @@ function body() {
 (async () => {
   const doc = H.makeDocument({ docTitle: "QRG Playbook", footerLeft: "QRG Playbook  " + DOT + "  Kit " + KIT_VERSION, body });
   const buf = await H.pack(doc);
-  fs.mkdirSync(OUT_DIR, { recursive: true });
-  const out = path.join(OUT_DIR, "QRG Playbook - " + STATUS + " " + stamp() + ".docx");
-  if (fs.existsSync(out)) { console.error("STOP: " + path.basename(out) + " already exists. Wait a minute and rerun."); process.exit(2); }
+  let out;
+  if (OUT_FILE) {
+    out = path.resolve(OUT_FILE);
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+  } else {
+    fs.mkdirSync(OUT_DIR, { recursive: true });
+    out = path.join(OUT_DIR, "QRG Playbook - " + STATUS + " " + stamp() + ".docx");
+    if (fs.existsSync(out)) { console.error("STOP: " + path.basename(out) + " already exists. Wait a minute or pass --out=<file.docx>."); process.exit(2); }
+  }
   fs.writeFileSync(out, buf);
   console.log("wrote " + out + " (" + Math.round(buf.length / 1024) + " KB, kit " + KIT_VERSION + ")");
 })();

@@ -2,7 +2,7 @@
   "name": "qrg-kit",
   "version": "2.0.0",
   "private": true,
-  "description": "Quick Reference Guide kit: config-driven Word generator, QA, screenshot annotator, cross-platform render, review lock, OK List, and send copies. Video tools (frames, captions, contact sheets of recordings) need  npm run add-video  (about 400 MB).",
+  "description": "Quick Reference Guide kit: config-driven US Letter Word generator, QA, brand-accent screenshot annotator, offline proofing, cross-platform LibreOffice render, review locks, Browser Review UI and OK List, and Word-default send copies. Video tools (frames, captions, contact sheets of recordings) need npm run add-video (about 400 MB).",
   "license": "UNLICENSED",
   "engines": {
     "node": ">=22"

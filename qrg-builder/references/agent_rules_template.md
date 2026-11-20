@@ -36,8 +36,8 @@ or missing screenshot. Do not rewrite a sibling that is already right. Report ea
 - `review/` (locks, OK List sheets, send copies), the state files, the work log, and `qrg.config.json`: the lead does
   locks, the OK List, send copies, and state updates.
 - Anything outside the project folder. No cloud writes, email, or chat.
-- Never hand-edit a .docx. Never use `ALLOW_REBUILD_OVER_EDITS=1`; if the guard stops a build, stop that guide and
-  report it. Never kill Word or Excel.
+- Never hand-edit a `.docx`. Never use `--allow-rebuild-over-edits` (or `ALLOW_REBUILD_OVER_EDITS=1`); if the guard
+  stops a build, stop that guide and report it. Never kill desktop LibreOffice, Word, or Excel.
 - Never `require()` a build script (it runs a build); syntax-check with `node --check`.
 
 ## 4. Shared files and locks
@@ -46,8 +46,8 @@ or missing screenshot. Do not rewrite a sibling that is already right. Report ea
   directly.
 - Any shared file (`qrg.config.json`, `lib/`, a helper used by several guides) is edited only under the build lock:
   `node $K/scripts/with_lock.js build node <your edit script.js>`. Prefer reporting the change to the lead.
-- Builds and renders take their own locks (`build_qrgs.js`, `render_guides.js`, `proof_guides.js`). Keep each job
-  short (4 guides or fewer), so other helpers are not kept waiting.
+- Builds and renders take their own locks (`build_qrgs.js`, `render_guides.js`). `proof_guides.js` runs offline
+  in-process and needs no lock. Keep each job short (4 guides or fewer), so other helpers are not kept waiting.
 - Put your working files under `_work/<round>/<your name>/`.
 - Check free disk space before pulling many frames; stop below <N> GB and report it.
 

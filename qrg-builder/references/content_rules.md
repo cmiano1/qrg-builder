@@ -1,7 +1,8 @@
 # Content rules: how to write a QRG
 
-A QRG is a short Word job aid for one task, for one role in one unit. It is an evergreen reference for anyone in
-the role, now or a year from now. It is not a record of a training class, and it is not a design document.
+A QRG is a short, evergreen, Standard US Letter Word guide for one task, for one role in one unit. It is a desk
+reference for anyone in the role, now or a year from now. It is not a record of a training class, and it is not a design
+document.
 
 These rules come from real reviewer comments on real guide sets. Each one exists because a reviewer flagged its
 absence. The QA (`qa_qrgs.js`) checks the ones a script can check; you check the rest by reading the rendered pages.
@@ -24,7 +25,9 @@ absence. The QA (`qa_qrgs.js`) checks the ones a script can check; you check the
 
 ## 2. Evergreen text
 
-- No session references, attendee or trainer names, or dates in guide text. No "Last updated" line.
+- Zero dates inside evergreen QRG text and no "Last updated" line (QA rejects dates in guide text). Use `MM/DD/YYYY`
+  only in work logs (`_QRG work log.md`), briefs, and state files (`_QRG - state.md`).
+- No session references or attendee or trainer names in guide text.
 - Never the words session, training, recording, walkthrough, sandbox, UAT, TBD, trainer, trainee, reviewer, dry run,
   facilitator (the QA fails on them; `qa.sessionWords` can change the list per project).
 - Role names only: "the Supervisor", "the system administrator", "Support Staff". Never a person's name. Put every
@@ -68,8 +71,9 @@ reviewer asks.
 - Purpose, notes, What happens next, and Troubleshooting are professional and mostly third person, using the
   project's own terms (the role names, record names, list views, and queues the users see). Never "someone".
 - Plain words, short sentences. No filler (leverage, robust, seamless, delve, elevate, unlock, tapestry).
-- American English: "gray" not "grey", "organize" not "organise", "toward" not "towards". Dates in prose are
-  MM/DD/YYYY. No em or en dashes anywhere: use a colon, comma, period, or parentheses.
+- American English: "gray" not "grey", "organize" not "organise", "toward" not "towards". Zero dates inside QRG prose
+  (use `MM/DD/YYYY` only in work logs, briefs, and state files). No em or en dashes anywhere: use a colon, comma,
+  period, or parentheses.
 - **Check boxes:** "select" and "clear" (or "check" and "uncheck"), never "tick" or "untick".
 - **Quoted on-screen messages:** a quoted or bolded message in the middle of a sentence drops its own final
   period ("When the window says **Case Reopened successfully**, click **Exit**."). A message that ends its own

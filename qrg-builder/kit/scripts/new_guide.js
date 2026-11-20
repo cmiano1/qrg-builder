@@ -63,6 +63,6 @@ if (EX) {
 const K = path.relative(P.root, P.KIT).replace(/\\/g, "/") || ".";
 console.log("\nNext (from " + P.root + "):"
   + (EX ? "" : "\n  write the guide (references/content_rules.md), add figures to annotate.json, then  node " + K + "/tools/annotate_screenshot.js \"" + rel(assetDir) + "/annotate.json\"  (--grid helps pick box coordinates)")
-  + "\n  QRG_SCRATCH=1 QRG_ONLY=\"" + SET.prefix + " " + nn + " \" node " + K + "/build_qrgs.js --set=" + SET.id + "     a test build"
+  + "\n  node " + K + "/build_qrgs.js --set=" + SET.id + " --scratch --only=\"" + SET.prefix + " " + nn + " \"     a test build"
   + "\n  node " + K + "/qa_qrgs.js --set=" + SET.id + " " + nn + " --scratch"
   + "\n  then the live build, QA, render, and look at every page (SKILL.md, the per-guide loop).");

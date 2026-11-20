@@ -47,8 +47,9 @@ const DEFAULTS = {
   sections: ["Purpose", "Who does this", "Before you start", "Steps", "What happens next", "Troubleshooting"],
   figureMaxHeightIn: 5.25,
   sets: [],
-  qa: { names: [], namesFile: "qa_names.txt", styleAllow: [], sessionWords: null, idPatterns: [], extraBanned: [] },
-  review: { dir: "review" },
+  qa: { names: [], namesFile: "qa_names.txt", dictionary: [], dictionaryFile: "qa_dictionary.txt", styleAllow: [], sessionWords: null, idPatterns: [], extraBanned: [] },
+  render: { soffice: null },
+  review: { dir: "review", sendDir: "_send", sendKeepNumber: false, withPdf: false },
 };
 
 function loadConfig(argv) {
@@ -59,12 +60,22 @@ function loadConfig(argv) {
   }
   const raw = JSON.parse(fs.readFileSync(file, "utf8"));
   const cfg = { ...DEFAULTS, ...raw, palette: { ...DEFAULTS.palette, ...(raw.palette || {}) },
-    qa: { ...DEFAULTS.qa, ...(raw.qa || {}) }, review: { ...DEFAULTS.review, ...(raw.review || {}) } };
+    qa: { ...DEFAULTS.qa, ...(raw.qa || {}) }, render: { ...DEFAULTS.render, ...(raw.render || {}) },
+    review: { ...DEFAULTS.review, ...(raw.review || {}) } };
   const root = path.dirname(file);
   const abs = (p) => path.resolve(root, p);
   const problems = [];
   if (!/^[A-Z]+$/.test(cfg.status)) problems.push('status must be capital letters (for example "DRAFT")');
-  if (!["letter", "a4"].includes(cfg.page)) problems.push('page must be "letter" or "a4"');
+  if (cfg.page !== "letter") {
+    problems.push(
+      cfg.page === "a4"
+        ? 'page "a4" is not supported; QRGs must use Standard US Letter ("letter", 8.5 x 11 in)'
+        : 'page must be "letter" (Standard US Letter, 8.5 x 11 in); got ' + JSON.stringify(cfg.page)
+    );
+  }
+  if (typeof cfg.review.withPdf !== "boolean") {
+    problems.push("review.withPdf must be true or false");
+  }
   const ids = new Set(), prefixes = new Set();
   for (const s of cfg.sets) {
     for (const k of ["id", "prefix", "unitLine", "footerTag", "dir", "out"]) if (!s[k]) problems.push("set " + (s.id || "?") + ": missing " + k);
@@ -91,10 +102,15 @@ function loadConfig(argv) {
     return s;
   };
   // Names the QA and the clean scan look for: config list plus the optional names file (one per line).
+  const bomRe = new RegExp("^" + String.fromCharCode(0xfeff));
   const names = [...(cfg.qa.names || [])];
   const nf = cfg.qa.namesFile ? abs(cfg.qa.namesFile) : null;
-  if (nf && fs.existsSync(nf)) for (const n of fs.readFileSync(nf, "utf8").split(/\r?\n/).map((x) => x.trim()).filter((x) => x && !x.startsWith("#"))) names.push(n);
-  return { cfg, file, root, abs, sets, getSet, names: [...new Set(names)], reviewDir: abs(cfg.review.dir), KIT };
+  if (nf && fs.existsSync(nf)) for (const n of fs.readFileSync(nf, "utf8").replace(bomRe, "").split(/\r?\n/).map((x) => x.trim()).filter((x) => x && !x.startsWith("#"))) names.push(n);
+  // Approved words for offline proofing: config list plus the optional dictionary file (one per line).
+  const dictionary = [...(cfg.qa.dictionary || [])];
+  const df = cfg.qa.dictionaryFile ? abs(cfg.qa.dictionaryFile) : null;
+  if (df && fs.existsSync(df)) for (const w of fs.readFileSync(df, "utf8").replace(bomRe, "").split(/\r?\n/).map((x) => x.trim()).filter((x) => x && !x.startsWith("#"))) dictionary.push(w);
+  return { cfg, file, root, abs, sets, getSet, names: [...new Set(names)], dictionary: [...new Set(dictionary)], reviewDir: abs(cfg.review.dir), KIT };
 }
 
 // Live build name: "<prefix> NN - <Title> - <STATUS> YYYYMMDD-HHMM.docx"

@@ -87,7 +87,7 @@ async function scanDocx(buf, P) {
     for (const [kind, re] of RULES) if (kind !== "note" && re.test(t)) hits.push({ kind, line: 0, text: n + ": " + t.slice(0, 160) });
   }
   if (/\bDRAFT\b/.test(raw)) hits.push({ kind: "draftmark", line: 0, text: "the word DRAFT appears in the body" });
-  if (meta["cp:lastModifiedBy"] && meta["cp:lastModifiedBy"] !== P.cfg.author) hits.push({ kind: "meta", line: 0, text: "last modified by " + meta["cp:lastModifiedBy"] + " (the file was saved in Word after the build)" });
+  if (meta["cp:lastModifiedBy"] && meta["cp:lastModifiedBy"] !== P.cfg.author) hits.push({ kind: "meta", line: 0, text: "last modified by " + meta["cp:lastModifiedBy"] + " (the file was saved outside the build)" });
   if (meta["dc:creator"] && P.cfg.author && meta["dc:creator"] !== P.cfg.author) hits.push({ kind: "meta", line: 0, text: "author is " + meta["dc:creator"] + ", config says " + P.cfg.author });
   const blockers = ["trackedChanges", "comments", "hiddenText", "highlight", "yellowShade"].filter((k) => xml[k] > 0).map((k) => k + " " + xml[k]);
   return { lines: lines.length, xml, meta, headerFooter: hf.map(([n, t]) => n + ": " + t), hits, blockers };

@@ -22,15 +22,17 @@
       "sendFolder": "__SET_LABEL__"
     }
   ],
-  "_qa_help": "names: people's first and last names that must never appear in a guide (or one per line in qa_names.txt). idPatterns: regex sources for internal tracking IDs (the example matches ABC-123 style ticket IDs). styleAllow: exact phrases the style check should skip (for example a field label that really says Grey). extraBanned: [{label, pattern, flags}] for project words to keep out (internal system names, client code names). sessionWords: a regex source that replaces the built-in list of session and build words.",
+  "_qa_help": "names: people's first and last names that must never appear in a guide (or one per line in qa_names.txt). dictionary: approved product names, acronyms, and UI labels for offline proofing (or one per line in qa_dictionary.txt). idPatterns: regex sources for internal tracking IDs (the example matches ABC-123 style ticket IDs). styleAllow: exact phrases the style check should skip (for example a field label that really says Grey). extraBanned: [{label, pattern, flags}] for project words to keep out (internal system names, client code names). sessionWords: a regex source that replaces the built-in list of session and build words.",
   "qa": {
     "names": [],
     "namesFile": "qa_names.txt",
+    "dictionary": [],
+    "dictionaryFile": "qa_dictionary.txt",
     "idPatterns": ["\\b[A-Z]{2,6}-[0-9]{1,6}\\b"],
     "styleAllow": [],
     "extraBanned": [],
     "sessionWords": null
   },
-  "_review_help": "dir: locks, renders, and OK List sheets. sendDir: local folder for clean-named copies to move by hand. sendKeepNumber: true keeps the NN in send names.",
-  "review": { "dir": "review", "sendDir": "_send", "sendKeepNumber": false }
+  "_review_help": "dir: locks, renders, saved review state, and OK List sheets. sendDir: local folder for clean-named copies to move by hand. sendKeepNumber: true keeps the NN in send names. withPdf: true stages a verified locked Render PDF alongside each clean-named Word Send Copy by default (can be overridden per run with --with-pdf or --no-pdf).",
+  "review": { "dir": "review", "sendDir": "_send", "sendKeepNumber": false, "withPdf": false }
 }

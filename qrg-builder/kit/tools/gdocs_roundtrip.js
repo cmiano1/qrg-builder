@@ -141,9 +141,11 @@ async function summarize(buf) {
   P.comments = all(await get("word/comments.xml"), /<w:comment /g).length;
 
   // Text, paragraph by paragraph (body only; header and footer text is above).
-  s.text = paras.map(ptext).map((t) => t.replace(/[ \u00a0]+/g, " ").trim()).filter(Boolean);
+  const nbspRe = new RegExp("[ " + String.fromCharCode(0x00a0) + "]+", "g");
+  const curlyQuoteRe = new RegExp("[" + String.fromCharCode(0x2018, 0x2019, 0x201c, 0x201d) + "]", "g");
+  s.text = paras.map(ptext).map((t) => t.replace(nbspRe, " ").trim()).filter(Boolean);
   P.textCharacters = s.text.join("").length;
-  P.curlyQuotes = (s.text.join("").match(/[\u2018\u2019\u201c\u201d]/g) || []).length;
+  P.curlyQuotes = (s.text.join("").match(curlyQuoteRe) || []).length;
   return s;
 }
 

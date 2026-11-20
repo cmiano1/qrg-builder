@@ -2,7 +2,7 @@
 
 Status: accepted
 
-To eliminate Microsoft Word COM (`word_proof.ps1`) while keeping deterministic, offline spelling and grammar checks even when a teammate runs kit scripts without an AI assistant, `proof_guides.js` will extract text from built `.docx` files and run Automattic's offline Rust/WASM `harper.js` (`Apache-2.0`, loaded via dynamic `import()` from CommonJS) backed by a per-project custom dictionary for approved UI labels and product names. AI agents still read `_work/qa_text_NN.txt` for meaning, clarity, and factual accuracy.
+To eliminate Microsoft Word COM (`word_proof.ps1`) while keeping deterministic, offline spelling and grammar checks even when a teammate runs kit scripts without an AI assistant, `proof_guides.js` will extract text from built `.docx` files and run Automattic's offline Rust/WASM `harper.js` (`Apache-2.0`, loaded via dynamic `import()` from CommonJS using `harper.js/binaryInlined` so directory paths with spaces and Windows drive letters never hit `harper.js/binary`'s raw `new URL(binary).pathname` bug) backed by a per-project custom dictionary for approved UI labels and product names. AI agents still read `_work/qa_text_NN.txt` for meaning, clarity, and factual accuracy.
 
 ## Considered Options
 

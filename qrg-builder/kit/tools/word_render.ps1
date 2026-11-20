@@ -49,9 +49,9 @@ try {
     }
 
     # wdExportFormatPDF = 17
-    # 11/11/2026: called late-bound with exactly two plain arguments (the way VBScript calls it). Since the 11/11 Office update
-    # (16.0.20527.20194), the direct form $doc.ExportAsFixedFormat($outPath, 17) through PowerShell's COM adapter hangs Word,
-    # even on a blank document, while this form exports in seconds. Tests: done_review_20261111/_scripts/word_mode_test.ps1.
+    # Called late-bound with exactly two plain arguments (the way VBScript calls it). Since Office update
+    # 16.0.20527.20194, the direct form $doc.ExportAsFixedFormat($outPath, 17) through PowerShell's COM adapter
+    # hangs Word, even on a blank document, while this form exports in seconds.
     $exportArgs = [object[]]@([string]$outPath, [int]17)
     [void][System.__ComObject].InvokeMember('ExportAsFixedFormat', [System.Reflection.BindingFlags]::InvokeMethod, $null, $doc, $exportArgs)
 

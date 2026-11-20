@@ -1,11 +1,13 @@
-// pack_skill.js: zips the qrg-builder skill (SKILL.md, references/, kit/) for a teammate, without node_modules, work
-// folders, or archives. The zip holds one top folder, qrg-builder/, so it unzips straight into ~/.claude/skills/.
+// pack_skill.js: zips the qrg-builder Skill (SKILL.md, references/, kit/) for a teammate, without node_modules, work
+// folders, or archives. The zip holds one top folder, qrg-builder/, so it unzips cleanly into any AI tool's skills
+// folder (Claude Code, Antigravity, Codex, Cursor) or any local folder for standalone CLI use.
 // Before zipping it checks every text file for em or en dashes and for a word list you pass (client names, people's
-// names), so nothing from your last project leaves with the kit. Read-only on the skill folder.
+// names), so nothing from your last project leaves with the Skill. Read-only on the Skill folder.
 // Usage:
 //   node pack_skill.js "<out folder>" [--words="Word1,Word2"] [--words-file="<one word per line>"] [--force]
+//   node pack_skill.js --out="<file.zip>" [--words="Word1,Word2"] [--words-file="<one word per line>"] [--force]
 //   --force  write the zip even if the check finds something (it still prints every hit)
-// Output: "<out folder>/QRG Builder Skill - <stamp>.zip" plus a .json list of the files and their SHA-256.
+// Output: "<out folder>/QRG Builder Skill - <stamp>.zip" (or --out path) plus a .json list of the files and their SHA-256.
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
@@ -13,11 +15,12 @@ const { stamp, arg, flag } = require("../lib/config");
 const JSZip = require("jszip");
 
 const SKILL = path.resolve(__dirname, "..", "..");
+const outFileArg = arg("out");
 const outDir = process.argv.slice(2).find((a) => !a.startsWith("--"));
-if (!outDir) { console.error('usage: node pack_skill.js "<out folder>" [--words="A,B"] [--words-file=<file>] [--force]'); process.exit(2); }
-if (!fs.existsSync(path.join(SKILL, "SKILL.md"))) { console.error("STOP: run this from the skill's own kit (~/.claude/skills/qrg-builder/kit/scripts/pack_skill.js), not a project's qrg_kit copy."); process.exit(2); }
+if (!outDir && !outFileArg) { console.error('usage: node pack_skill.js "<out folder>" [--out="<file.zip>"] [--words="A,B"] [--words-file=<file>] [--force]'); process.exit(2); }
+if (!fs.existsSync(path.join(SKILL, "SKILL.md"))) { console.error("STOP: run this from the Skill's own kit (<skill>/kit/scripts/pack_skill.js), not a project's qrg_kit copy."); process.exit(2); }
 const SKIP = new Set(["node_modules", "_work", "_archive", "_archive_backups", ".git"]);
-const TEXT = /[.](js|json|md|ps1|txt|vbs|sh)$/i;
+const TEXT = /[.](js|json|md|ps1|txt|vbs|sh|html|css)$/i;
 
 const files = [];
 const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) {
@@ -55,13 +58,20 @@ for (const f of files) {
   list.push({ file: rel, bytes: buf.length, sha256: crypto.createHash("sha256").update(buf).digest("hex") });
 }
 const kitVersion = JSON.parse(fs.readFileSync(path.join(SKILL, "kit", "package.json"), "utf8")).version;
-fs.mkdirSync(outDir, { recursive: true });
-const name = "QRG Builder Skill - " + stamp() + ".zip";
-const out = path.join(path.resolve(outDir), name);
-if (fs.existsSync(out)) { console.error("STOP: " + name + " already exists. Wait a minute and rerun."); process.exit(2); }
+let out;
+if (outFileArg) {
+  out = path.resolve(outFileArg);
+  if (!/[.]zip$/i.test(out)) out += ".zip";
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+} else {
+  fs.mkdirSync(outDir, { recursive: true });
+  const name = "QRG Builder Skill - " + stamp() + ".zip";
+  out = path.join(path.resolve(outDir), name);
+}
+if (fs.existsSync(out)) { console.error("STOP: " + path.basename(out) + " already exists. Wait a minute or pass --out=<file.zip>."); process.exit(2); }
 zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }).then((buf) => {
   fs.writeFileSync(out, buf);
   fs.writeFileSync(out.replace(/[.]zip$/, ".json"), JSON.stringify({ kitVersion, made: new Date().toISOString(), files: list }, null, 2) + "\n");
   console.log("wrote " + out + " (" + list.length + " files, " + Math.round(buf.length / 1024) + " KB, kit " + kitVersion + ")");
-  console.log("Teammate: unzip into ~/.claude/skills/ (so the folder is ~/.claude/skills/qrg-builder/), then in kit/: npm install && npm run check");
+  console.log("Teammate: unzip into your AI tool's skills folder (or any local folder for standalone CLI) so you have qrg-builder/, then in qrg-builder/kit/: npm install && npm run check");
 });

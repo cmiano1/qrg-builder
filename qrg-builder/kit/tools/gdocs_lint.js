@@ -3,14 +3,14 @@
 // generated builds with the copies downloaded back from Drive after "Save as Google Docs".
 //
 // CLI (from the kit folder):
-//   node tools/gdocs_lint.js [--page=letter|a4|any] [--full-width] [--fonts=Calibri,Arial] <file.docx> [...]
+//   node tools/gdocs_lint.js [--page=letter|any] [--full-width] [--fonts=Calibri,Arial] <file.docx> [...]
 //   Exit 1 if any FAIL. WARN lines are printed but do not fail the run.
 // Module:
 //   const { lintDocx } = require("./tools/gdocs_lint");
 //   const findings = await lintDocx(buffer, { page: "letter", fullWidth: true });  // [{ level, rule, detail }]
 //
 // Rules (FAIL unless marked WARN):
-//   page-size        pgSz is the expected size (letter 12240x15840 or a4 11906x16838), portrait.
+//   page-size        pgSz is Standard US Letter (letter 12240x15840, 8.5 x 11 in), portrait. A4 is not supported.
 //   table-width      every table: fixed layout; table, grid, and every cell width in DXA (no pct, no auto);
 //                    grid sums to the table width; each cell matches its grid columns; with --full-width the
 //                    table spans the content width (page width minus left and right margins).
@@ -45,7 +45,7 @@ const path = require("path");
 let JSZip;
 try { JSZip = require("jszip"); } catch (e) { JSZip = require(path.resolve(__dirname, "..", "node_modules", "jszip")); }
 
-const PAGES = { letter: { w: 12240, h: 15840 }, a4: { w: 11906, h: 16838 } };
+const PAGES = { letter: { w: 12240, h: 15840 } };
 const TWIP_EMU = 635;
 const BULLET_FONTS = ["Symbol", "Wingdings", "Courier New", "Noto Sans Symbols"];
 const attr = (tag, a) => ((tag.match(new RegExp(`\\b${a}="([^"]*)"`)) || [])[1]);
@@ -53,6 +53,9 @@ const num = (v) => (v === undefined ? NaN : Math.round(parseFloat(v)));
 
 async function lintDocx(buf, opts = {}) {
   const o = { page: "letter", fullWidth: false, fonts: ["Calibri"], altText: true, ...opts };
+  if (o.page !== "any" && !PAGES[o.page]) {
+    throw new Error(`Unsupported page size "${o.page}". QRGs must use Standard US Letter ("letter", 12240x15840 twips); A4 is not supported.`);
+  }
   const out = [];
   const add = (level, rule, detail) => out.push({ level, rule, detail });
   const zip = await JSZip.loadAsync(buf);
@@ -234,7 +237,7 @@ if (require.main === module) {
     else if (a === "--no-alt-text") opts.altText = false;
     else files.push(a);
   }
-  if (!files.length) { console.log("usage: node tools/gdocs_lint.js [--page=letter|a4|any] [--full-width] [--fonts=Calibri] <file.docx> [...]"); process.exit(2); }
+  if (!files.length) { console.log("usage: node tools/gdocs_lint.js [--page=letter|any] [--full-width] [--fonts=Calibri] <file.docx> [...]"); process.exit(2); }
   (async () => {
     let fails = 0;
     for (const f of files) {
@@ -246,5 +249,5 @@ if (require.main === module) {
     }
     console.log(fails ? `\nRESULT: ${fails} FAIL finding(s)` : "\nRESULT: no FAIL findings");
     process.exit(fails ? 1 : 0);
-  })().catch((e) => { console.error(e); process.exit(2); });
+  })().catch((e) => { console.error(e && e.message ? e.message : e); process.exit(2); });
 }

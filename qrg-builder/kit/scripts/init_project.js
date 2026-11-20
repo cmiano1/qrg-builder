@@ -1,8 +1,8 @@
 // init_project.js: sets up a QRG project, or adds a set (one audience) to an existing one. Never overwrites a file:
 // anything that already exists is left as is and reported as SKIPPED.
 //
-// New project (Git Bash; the kit path is wherever the skill lives):
-//   node ~/.claude/skills/qrg-builder/kit/scripts/init_project.js --dir="<project folder>" --project="<Client or project>" \
+// New project (from any terminal; <skill> is wherever you unpacked or cloned qrg-builder):
+//   node "<skill>/kit/scripts/init_project.js" --dir="<project folder>" --project="<Client or project>" \
 //     --set=UNIT1-INV --label="Unit 1 Investigator" --unit-line="Unit 1 | Investigator"
 // Add a set to that project later (same command, new --set; the config gets one more set):
 //   node qrg_kit/scripts/init_project.js --set=UNIT1-SUP --label="Unit 1 Supervisor"
@@ -20,9 +20,9 @@
 //                           was built with and a teammate needs only the project folder. skill: run from the skill folder.
 //   --upgrade-kit           replace <project>/qrg_kit with the skill's current kit; the old copy goes to
 //                           _archive_backups/ and its node_modules are moved across
-//   --install               run npm install in the kit folder afterward (about 60 MB). The video tools (frames, captions,
+//   --install               run npm install in the kit folder afterward. The video tools (frames, captions,
 //                           and contact sheets from recordings) also need  npm run add-video  in the kit folder (about 400 MB).
-//                           Do not use npm's --omit=optional: it also drops sharp's Windows image library.
+//                           Do not use npm's --omit=optional: it also drops sharp's platform image library.
 const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
@@ -41,6 +41,10 @@ const problems = [];
 if (!/^[A-Za-z0-9-]+$/.test(set.id)) problems.push("--set may use letters, digits, and hyphens only");
 for (const k of ["label", "prefix"]) if (UNSAFE.test(set[k])) problems.push("--" + k + " has a file-name-unsafe character (\\ / : * ? \" < > | # % &): " + set[k]);
 if (set.out.split("/").some((p) => UNSAFE.test(p))) problems.push("--out has a file-name-unsafe character: " + set.out);
+const pageArg = arg("page");
+if (pageArg !== null && pageArg !== "letter") {
+  problems.push('--page "' + pageArg + '" is not supported; QRGs must use Standard US Letter ("letter", 8.5 x 11 in)');
+}
 if (problems.length) { console.error("STOP:\n  " + problems.join("\n  ")); process.exit(2); }
 const KITMODE = arg("kit") || "copy";
 if (!["copy", "skill"].includes(KITMODE)) { console.error("STOP: --kit must be copy or skill"); process.exit(2); }
@@ -58,7 +62,7 @@ const mkdir = (rel) => { const p = path.join(DIR, rel); if (!fs.existsSync(p)) {
 
 // ---- the kit ----
 const KITDIR = KITMODE === "copy" ? path.join(DIR, "qrg_kit") : SKILL_KIT;
-const SKIP = new Set(["node_modules", "playbook", "_work", "package-lock.json"]);
+const SKIP = new Set(["node_modules", "playbook", "_work"]);
 function copyKit(src, dst) {
   fs.mkdirSync(dst, { recursive: true });
   for (const e of fs.readdirSync(src, { withFileTypes: true })) {
@@ -87,6 +91,10 @@ if (KITMODE === "copy") {
 const cfgPath = path.join(DIR, "qrg.config.json");
 if (fs.existsSync(cfgPath)) {
   const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+  if (cfg.page != null && cfg.page !== "letter") {
+    console.error('STOP: qrg.config.json page "' + cfg.page + '" is not supported; QRGs must use Standard US Letter ("letter", 8.5 x 11 in).');
+    process.exit(2);
+  }
   cfg.sets = cfg.sets || [];
   const have = cfg.sets.find((s) => s.id === set.id);
   if (have) { said.push("SKIPPED (exists) set " + set.id + " in qrg.config.json (its settings are kept; edit the config to change them)"); Object.assign(set, have); }
@@ -120,6 +128,12 @@ write("qa_names.txt", [
   "# Lines starting with # are ignored.",
   "",
 ].join("\n"));
+write("qa_dictionary.txt", [
+  "# Approved words for offline proofing (one word or UI label per line).",
+  "# Add product names, acronyms, and screen labels so proof_guides.js does not flag them.",
+  "# Lines starting with # are ignored.",
+  "",
+].join("\n"));
 const today = new Date(), mdY = String(today.getMonth() + 1).padStart(2, "0") + "/" + String(today.getDate()).padStart(2, "0") + "/" + today.getFullYear();
 const K = KITMODE === "copy" ? "qrg_kit" : SKILL_KIT.replace(/\\/g, "/");
 write("_QRG - state.md", [
@@ -145,7 +159,7 @@ write("_QRG - state.md", [
   "## Key files",
   "- qrg.config.json: sets, names, house style. Guides: sets/<set>/guides/NN.js. Screenshots: sets/<set>/assets/<key>NN/.",
   "- Word files: " + set.out + "/ (one live build per guide; older builds in _archive/).",
-  "- Review: review/ (renders, locks.json, OK List sheets). Send copies: _send/ (local; moved to the shared place by hand).",
+  "- Review: review/ (renders, locks.json, saved review state, OK List sheets). Send copies: _send/ (local; moved to the shared place by hand).",
   "- Work log (left out until answered, open questions, conflicts): _QRG work log.md",
   "",
   "## Open questions / decisions",
@@ -165,4 +179,4 @@ const needInstall = !fs.existsSync(path.join(KITDIR, "node_modules", "docx"));
 console.log("\nNext (from " + DIR + "):" + (needInstall ? "\n  (cd \"" + (KITMODE === "copy" ? "qrg_kit" : KITDIR) + "\" && npm install)" : "")
   + "\n  node " + K + "/scripts/new_guide.js --set=" + set.id + " --example        a worked example guide to build and check first"
   + "\n  node " + K + "/scripts/new_guide.js --set=" + set.id + " 01 \"<Title>\" \"<Subtitle>\""
-  + "\n  Fill in qa_names.txt, and if this project has a _PROJECT_STATE.md hub, add a row for _QRG - state.md.");
+  + "\n  Fill in qa_names.txt and qa_dictionary.txt, and if this project has a _PROJECT_STATE.md hub, add a row for _QRG - state.md.");

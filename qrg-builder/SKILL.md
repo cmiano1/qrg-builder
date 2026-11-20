@@ -1,139 +1,171 @@
 ---
 name: qrg-builder
-description: Build Quick Reference Guides (QRGs, job aids, work instructions, step-by-step how-to guides) as Word files from training recordings, screenshots, and notes, with a config-driven generator, screenshot annotator, QA, Word render, review locks, an OK List for the reviewer, and clean send copies. Use when the user wants to set up a QRG project, write or fix a QRG, annotate QRG screenshots, run QRG QA or renders, lock guides for review, build the OK List, or make send copies. Triggers include "QRG", "quick reference guide", "job aid", "work instruction", "how-to guide for end users", "OK List", "send copies".
+description: Build and release Quick Reference Guides (QRGs) as Standard US Letter Word (.docx) Working Deliverables and Final Deliverables from recordings, screenshots, and notes. Use to set up a QRG project, author or revise a Guide Source, annotate screenshots, run QA and offline proofing, generate visual Renders (LibreOffice + pure-Node PNGs), apply SHA-256 Review Locks, review in the Local Browser Review UI or .xlsx OK List, or stage Send Copies (.docx default plus optional PDF). Triggers: "QRG", "quick reference guide", "job aid", "work instruction", "how-to guide for end users", "OK List", "Browser Review UI", "Send Copies".
 ---
 
-# QRG builder
+# QRG Builder
 
-One QRG = one task, one Word file, written for the person who does the task. The kit in `kit/` builds every guide
-from a small guide file plus annotated screenshots, checks it, renders it through Word, and carries it through a
-review gate so only the exact file the reviewer read can be sent.
+One QRG = one task, one Standard US Letter Word file (`8.5 x 11 in`), written for one role. The Kit in `kit/` builds
+every Working Deliverable from a Guide Source plus annotated screenshots, verifies Google Docs compatibility and writing
+rules, runs offline spelling and grammar proofing, generates visual Renders, and enforces SHA-256 Review Locks so only
+the exact approved build becomes a Send Copy.
 
-Why it is built this way: guides change many times before go-live, and reviewers lose trust fast when a "fixed"
-guide comes back with new errors. So the generator is the master, every check is a script, and a guide is locked
-by hash once the reviewer is shown it.
+Works identically on Windows, macOS, and Linux in Claude Code, Antigravity, Codex, Cursor, or standalone Node.js CLI with
+zero paid Microsoft Office or admin-install requirements.
 
 ## Ground rules (always)
 
 - **Draft locally, publish by hand.** Write only inside the project folder. Never write to a shared drive, Google
-  Workspace, email, or chat. Send copies land in the project's `_send/` folder; a person moves them.
-- **Facts only.** A step goes in a guide only when it is shown (you checked the frame or screenshot) or stated (the
-  process owner said it). Anything else is left out and logged as a question. Never hedge in a guide.
-- **Generator is master.** Never hand-edit a built .docx. The build stops if one was edited after it was built.
-  If the user edited one, diff it, fold the edits into the guide file, then rebuild (`references/lessons_learned.md`).
-- **House style:** no em or en dashes, American English, plain words, MM/DD/YYYY in prose, bold for on-screen labels.
-  File names: `{Name} - {STATUS} {YYYYMMDD-HHMM}.ext`.
-- **Environment:** Windows, Git Bash, Node 20+, desktop Word (renders and proofing go through Word COM via
-  `powershell.exe`). No Python needed. Syntax-check a build script with `node --check`; never `require()` one
-  (requiring a build script runs a real build).
-- **A render is not a pass.** After every render, read every page PNG yourself.
+  Workspace, email, or chat. Stage Final Deliverable Send Copies in `_send/`; a person delivers them.
+- **Facts only.** Include a step only when it is shown (frame or live screen verified) or stated (process owner
+  confirmed). Leave unconfirmed items out and log specific questions in `_QRG work log.md`. Never hedge in a QRG.
+- **Generator is master.** Edit the Guide Source (`guides/NN.js`), never a built `.docx`. `build_qrgs.js` stops if a
+  live `.docx` was edited after its build; diff it, fold every edit into the Guide Source, then rebuild with
+  `--allow-rebuild-over-edits` (`references/lessons_learned.md`).
+- **House style and dates.** Standard US Letter (`8.5 x 11 in`, `1 in` margins, `Calibri`), American English, plain
+  words, bold on-screen labels, zero em or en dashes. **Zero dates inside evergreen QRGs** (no "Last updated" line);
+  use `MM/DD/YYYY` only in work logs, briefs, and state files. Live file names: `{Name} - {STATUS} {YYYYMMDD-HHMM}.docx`.
+- **Environment.** Windows, macOS, or Linux; Node.js 22+ LTS; cross-shell CLI flags (`--scratch`, `--only=...`,
+  `--include-hold`, `--allow-rebuild-over-edits`, `--with-pdf`). Renders use auto-detected headless LibreOffice
+  (standard install, Windows LibreOffice Portable, macOS `~/Applications`, Linux AppImage, `QRG_SOFFICE` /
+  `render.soffice`, or optional Windows Word fallback) plus pure-Node PNG rasterization. Proofing runs offline in Node
+  (`harper.js` + `qa_dictionary.txt`). Syntax-check scripts with `node --check`; never `require()` `build_qrgs.js`
+  (requiring it runs a real build).
+- **Read every rendered page.** A Render is never a pass by itself: visually inspect every page PNG before locking.
 
 ## Where things are
 
-| Path | What |
-|---|---|
-| `kit/` | The kit: `build_qrgs.js`, `qa_qrgs.js`, `lib/`, `scripts/`, `tools/`, `templates/`. Full reference: `kit/README.md` |
-| `kit/tools/README.md` | Screenshot, video, Word, and Google-safety helpers |
-| `references/content_rules.md` | How to write a guide: sections, steps, figures, captions, callouts, tone |
-| `references/screenshot_rules.md` | Picking frames, cropping, badges, redaction, cut-aways |
-| `references/evidence_and_questions.md` | Shown or stated, source order, left-out items, questions, conflicts |
-| `references/definition_of_done.md` | The checklist a guide must pass before it is locked |
-| `references/review_and_release.md` | Render, lock, OK List, picks, fix rounds, send copies |
-| `references/lessons_learned.md` | Tool traps already hit and how to avoid them |
-| `references/unit_addendum_template.md` | Per-set facts and limits (copy into the project) |
-| `references/agent_rules_template.md` | Shared rules for helper agents when several build at once |
-| `references/setup_for_teammates.md` | First-time setup for another consultant |
-| `kit/playbook/build_playbook.js` | Builds the QRG Playbook (Word), the plain-language version of this process for the team. Edit the generator, never the .docx |
+Open each reference when its trigger branch applies:
 
-Read `content_rules.md` and `screenshot_rules.md` before writing the first guide in a session.
+| Path | Open when |
+|---|---|
+| `references/setup_for_teammates.md` | First-time machine setup (Windows, macOS, Linux; zip or Git install; no-admin LibreOffice; Claude Code, Antigravity, Codex, Cursor, or standalone CLI) |
+| `references/content_rules.md` | Before authoring or revising the first Guide Source in a run (sections, steps, captions, callouts, tone, dates) |
+| `references/screenshot_rules.md` | Before selecting video frames, cropping, redacting, or writing `annotate.json` |
+| `references/evidence_and_questions.md` | Resolving conflicting sources, labeling shown vs. stated facts, or logging open questions |
+| `references/definition_of_done.md` | Verifying a live build before applying a Review Lock |
+| `references/review_and_release.md` | Running Renders, Review Locks, Browser Review UI, `.xlsx` OK Lists, fix rounds, or Send Copies |
+| `references/lessons_learned.md` | Debugging hand edits, LibreOffice/font quirks, Google Docs round-trips, or recording issues |
+| `references/unit_addendum_template.md` | Copying per-Set audience, privacy, and scope rules into a new project |
+| `references/agent_rules_template.md` | Dispatching multiple helper agents in parallel |
+| `kit/README.md` | Looking up any `qrg.config.json` key or Kit script option |
+| `kit/tools/README.md` | Running screenshot, video, Google-safety, or optional Windows fallback tools |
+| `kit/playbook/build_playbook.js` | Rebuilding the 11-page Team Playbook (`.docx`) for non-technical teammates |
+| `kit/playbook/build_quickstart_qrg.js` | Rebuilding the 2-page Quick-Start QRG (*"Make QRGs with the QRG Builder Skill"*) |
 
 ## 1. Set up a project (once)
 
-From Git Bash (the kit path is where this skill lives, usually `~/.claude/skills/qrg-builder/kit`):
+Run from any terminal (`<skill>` is wherever you unpacked or cloned `qrg-builder`; every Kit script auto-detects its
+Skill root relative to itself):
 
 ```sh
-node ~/.claude/skills/qrg-builder/kit/scripts/init_project.js --dir="<project folder>" --project="<Client or project>" \
+node "<skill>/kit/scripts/init_project.js" --dir="<project folder>" --project="<Client or project>" \
   --set=UNIT1-INV --label="Unit 1 Investigator" --unit-line="Unit 1 | Investigator" --install
 cd "<project folder>"
 node qrg_kit/scripts/check_kit.js
 node qrg_kit/scripts/new_guide.js --set=UNIT1-INV --example
 ```
 
-- `--kit=copy` (default) copies the kit into `<project>/qrg_kit/`, so the project keeps its kit version and a teammate
-  needs only the project folder. `--kit=skill` runs from the skill folder instead. `--upgrade-kit` moves a project to
-  the skill's current kit (the old copy goes to `_archive_backups/`).
-- Add another audience later with the same command and a new `--set`. An existing set keeps its settings.
-- Video tools (frames, captions, contact sheets from recordings) need `npm run add-video` in the kit folder (about 400 MB).
-- Never install with `npm install --omit=optional`: it drops sharp's Windows image library and the annotator stops.
-- Build, QA, and render the example once (section 2) before real work. It proves Word, sharp, and the lint all work.
-- Fill in `qa_names.txt` with every person's name seen in the sources, and `qa.extraBanned` in `qrg.config.json`
-  with internal system names and code words that must not reach a reader.
-- If the project has a `_PROJECT_STATE.md` hub, add a row for `_QRG - state.md` in the same session.
+- `--kit=copy` (default) copies the Kit and its pinned `package-lock.json` into `<project>/qrg_kit/`. `--kit=skill`
+  runs from the Skill folder. `--upgrade-kit` upgrades `<project>/qrg_kit/` (moving the prior copy to `_archive_backups/`).
+- Add another Set later with the same command and a new `--set`; existing Sets keep their configuration.
+- Video extraction tools are optional: run `npm run add-video` in the Kit folder (~400 MB).
+- Always run plain `npm install` (omitting optional dependencies drops native `sharp` and `@napi-rs/canvas` binaries).
+- Fill in `qa_names.txt` (people's names to keep out of QRGs), `qa_dictionary.txt` (approved client UI labels, product
+  names, and acronyms for offline proofing), `qa.extraBanned`, and `palette.accent` in `qrg.config.json`.
+- If the project has a `_PROJECT_STATE.md` hub, add a row pointing to `_QRG - state.md`.
+- Before writing guide 01, confirm the audience per Set, task list, sources, process-question owners, and reviewer; record
+  them in `_QRG - state.md` and each Set's unit addendum.
 
-Interview the user before the first guide if these are not known: the audience per set, the task list (one guide
-each), the sources per task (recordings, captures, notes, a test login), who answers process questions, and who
-gives the OK to send. Record them in `_QRG - state.md` and a unit addendum.
+**Done when:** `check_kit.js` ends `RESULT: kit ready` and the worked example builds, passes QA, proofs, and renders cleanly.
 
 ## 2. The per-guide loop
 
-Commands run from the project root. `K=qrg_kit` (copy mode) or the skill kit path (skill mode).
+Run commands from the project root. Replace `<K>` with `qrg_kit` (copy mode) or `<skill>/kit` (skill mode).
 
-1. **Brief.** Write down the task, the reader, the trigger, the sources (recording, timestamps), and anything out of
-   scope. Search captions first, then check frames (`kit/tools/README.md`).
-2. **Start the guide.** `node $K/scripts/new_guide.js --set=<id> NN "<Title>" "<Subtitle>"`. Titles are task names in
-   title case, short, with no `\ / : * ? " < > | # % &`.
-3. **Screenshots.** Pull exact frames, put them in `assets/<key>NN/src/` (never edit a source), describe each figure
-   in `annotate.json`, then `node $K/tools/annotate_screenshot.js "<set dir>/assets/<key>NN/annotate.json"`
-   (`--grid` helps pick box coordinates). Read every output PNG.
-4. **Write the guide file** (`<set dir>/guides/NN.js`) by `references/content_rules.md`. Remove every TODO.
-5. **Scratch build and QA.**
-   `QRG_SCRATCH=1 QRG_ONLY="<prefix> NN " node $K/build_qrgs.js --set=<id>` (the trailing space matters), then
-   `node $K/qa_qrgs.js --set=<id> NN --scratch`. Fix every FAIL at its source. Read `_work/qa_text_NN.txt`: the
-   QA cannot judge meaning.
-6. **Render the scratch build and read every page.**
-   `node $K/scripts/render_guides.js --file="<scratch docx>"`. Check the definition of done.
-7. **Live build.** `QRG_ONLY="<prefix> NN " node $K/build_qrgs.js --set=<id>`, then `node $K/qa_qrgs.js --set=<id> NN`.
-8. **Proof.** `node $K/scripts/proof_guides.js --set=<id> NN`. Fix real flags; note false positives (UI labels,
-   fragments in steps).
-9. **Render the live build and read every page.** `node $K/scripts/render_guides.js --set=<id> NN`.
-10. **Log it** in `_QRG work log.md` (Done row, left-out items, questions by who answers, conflicts). Update
-    `_QRG - state.md`.
+1. **Brief.** Record the task, role, trigger, sources (recording and timestamps or captures), and out-of-scope items.
+   Search captions first, then verify frames (`kit/tools/README.md`).
+2. **Scaffold.** `node <K>/scripts/new_guide.js --set=<id> NN "<Title>" "<Subtitle>"`. Keep titles short, in title
+   case, with no `\ / : * ? " < > | # % &`.
+3. **Annotate screenshots.** Place immutable source PNGs in `assets/<key>NN/src/`, configure `annotate.json`, and run
+   `node <K>/tools/annotate_screenshot.js "<set dir>/assets/<key>NN/annotate.json"` (`--grid` aids coordinate picking;
+   callout color reads `palette.accent` from `qrg.config.json`). Visually inspect every output PNG.
+4. **Author Guide Source.** Edit `<set dir>/guides/NN.js` per `references/content_rules.md`. Remove every `TODO`.
+5. **Scratch build, QA, and meaning check.**
+   `node <K>/build_qrgs.js --set=<id> --scratch --only="<prefix> NN "` (include the trailing space after `NN`), then
+   `node <K>/qa_qrgs.js --set=<id> NN --scratch`. Fix every FAIL at its source, and read `<set dir>/_work/qa_text_NN.txt`
+   yourself to verify meaning, clarity, and factual accuracy.
+6. **Scratch Render and visual inspection.**
+   `node <K>/scripts/render_guides.js --file="<scratch docx>"`. Inspect every page PNG against `references/definition_of_done.md`.
+7. **Live build and QA.**
+   `node <K>/build_qrgs.js --set=<id> --only="<prefix> NN "` then `node <K>/qa_qrgs.js --set=<id> NN`.
+8. **Offline proofing and AI meaning review.**
+   `node <K>/scripts/proof_guides.js --set=<id> NN` runs offline `harper.js` spelling and grammar checks backed by
+   `qa_dictionary.txt`. Fix real errors, add valid client terms to `qa_dictionary.txt`, and review `_work/qa_text_NN.txt`
+   for clarity and accuracy.
+9. **Live Render and visual inspection.**
+   `node <K>/scripts/render_guides.js --set=<id> NN`. Visually inspect every rendered page PNG.
+10. **Log and update state.** Add a Done row, left-out items, questions, and conflicts to `_QRG work log.md` (using
+    `MM/DD/YYYY`), and update `_QRG - state.md`.
 
-Fix problems at the earliest source: a bad crop in `annotate.json`, a wording problem in the guide file, a layout
-problem that repeats across guides in `lib/docx_helpers.js`. Then rebuild and re-render.
+Fix issues at the earliest source: crop/badges in `annotate.json`, prose in `guides/NN.js`, recurring layout issues in
+`lib/docx_helpers.js`. Then rebuild and re-render.
+
+**Done when:** every checkbox in `references/definition_of_done.md` passes for the live build.
 
 ## 3. Review and release
 
 Full detail: `references/review_and_release.md`.
 
 ```sh
-node $K/scripts/render_guides.js --set=<id>                 # a render from the exact live file
-node $K/scripts/lock_guides.js --check --set=<id>           # report only
-node $K/scripts/lock_guides.js --how="first build, QA clean, pages read" --set=<id>
-node $K/scripts/build_ok_list.js                            # review/QRG OK List - DRAFT <stamp>.xlsx
-# the reviewer picks OK to send / OK to send, note for later / Fix before sending, saves, closes
-node $K/scripts/make_send_copies.js --dry                   # then without --dry
-node $K/scripts/client_ready_scan.js "<send copy.docx>"     # last look before a person moves them
+node <K>/scripts/render_guides.js --set=<id>
+node <K>/scripts/lock_guides.js --check --set=<id>
+node <K>/scripts/lock_guides.js --how="first build, QA clean, pages read" --set=<id>
 ```
 
-- Lock only after the pages were read. A lock refuses a file with no matching render, a QA finding, a hand edit,
-  or a clean-scan blocker.
-- A fix round: read the reviewer's comments verbatim, fix, rebuild, QA, render, read pages, relock, build a new
-  OK List. Picks carry forward only for unchanged files; a rebuilt guide comes back blank with its earlier call shown.
-- Send copies are made only for "OK to send" picks whose file still matches its lock. Stop there and tell the user
-  where they are. The user moves them.
+Choose either (or both) review surfaces; both enforce identical SHA-256 Review Locks and carry-forward rules:
 
-## 4. Several agents at once
+- **Local Browser Review UI (no Excel required):**
+  `node <K>/scripts/review_ui.js` opens locally on `127.0.0.1` with rendered US Letter pages side by side. Picks and
+  comments auto-save into `review/`, and the UI can export `.xlsx` OK Lists or stage Send Copies directly.
+- **`.xlsx` OK List (spreadsheet handoff):**
+  `node <K>/scripts/build_ok_list.js` writes `review/QRG OK List - DRAFT <stamp>.xlsx`, reconciling any saved Browser
+  Review UI picks with prior sheets.
 
-When helper agents build in parallel, give each one a brief built from `references/agent_rules_template.md`:
-one owner per guide file, shared files edited only under `node $K/scripts/with_lock.js build ...`, every Word job
-under the render lock (the kit scripts take it themselves), and a report per helper. The lead locks guides and
-builds the OK List; helpers never do.
+**Fix rounds:** read reviewer comments verbatim, resolve every item, rebuild, QA, proof, render, inspect every page PNG,
+relock with a `--how` summary, and refresh the review surface. Unchanged locked guides carry forward automatically;
+rebuilt guides reset blank with their earlier call shown.
+
+**Final Deliverable Send Copies (explicit confirmation required):**
+Clean-named Word (`.docx`) Send Copies are staged by default. **Before running `make_send_copies.js`, ask the user:**
+*"Do you also want matching PDF copies alongside the Word (.docx) Send Copies?"*
+
+```sh
+# Default (Word .docx only):
+node <K>/scripts/make_send_copies.js --dry
+node <K>/scripts/make_send_copies.js
+
+# When matching PDFs are requested (or set review.withPdf: true in qrg.config.json):
+node <K>/scripts/make_send_copies.js --dry --with-pdf
+node <K>/scripts/make_send_copies.js --with-pdf
+
+node <K>/scripts/client_ready_scan.js "<send copy.docx>"
+```
+
+**Done when:** approved, verified Send Copies exist in `_send/`, `client_ready_scan.js` reports zero blockers, and you
+have told the user the exact local `_send/` paths so a person can deliver them.
+
+## 4. Several helper agents at once
+
+Give every helper a brief from `references/agent_rules_template.md`: one owner per Guide Source, shared file edits run
+under `node <K>/scripts/with_lock.js build ...`, and renders automatically serialize under the machine-wide render lock
+(`proof_guides.js` runs in-process without needing a lock). Only the lead locks guides, builds OK Lists, or stages Send
+Copies.
 
 ## 5. Finish a session
 
-- Update `_QRG - state.md` (and the hub row if there is one) and the work log.
-- Report to the user: guides built or changed (file names, page counts), checks run and their results, items left
-  out and the questions that would unblock them, and the next command.
-- Kit problems found: note them in the work log "Tool problems" table, and fix the skill kit if the fix is general.
-  Bump `kit/package.json` version when the kit changes, so `--upgrade-kit` shows the difference.
+- Update `_QRG - state.md` (plus the hub row if one exists) and `_QRG work log.md` (with `MM/DD/YYYY` dates).
+- Report to the user: guides built or revised (file names and page counts), checks run and outcomes, left-out items and
+  questions that unblock them, and the next command.
+- Log general Kit bugs in the work log "Tool problems" table; when fixing the Skill Kit, bump `kit/package.json` so
+  `--upgrade-kit` surfaces the upgrade.

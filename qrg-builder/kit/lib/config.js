@@ -47,7 +47,7 @@ const DEFAULTS = {
   sections: ["Purpose", "Who does this", "Before you start", "Steps", "What happens next", "Troubleshooting"],
   figureMaxHeightIn: 5.25,
   sets: [],
-  qa: { names: [], namesFile: "qa_names.txt", styleAllow: [], sessionWords: null, idPatterns: [], extraBanned: [] },
+  qa: { names: [], namesFile: "qa_names.txt", dictionary: [], dictionaryFile: "qa_dictionary.txt", styleAllow: [], sessionWords: null, idPatterns: [], extraBanned: [] },
   render: { soffice: null },
   review: { dir: "review" },
 };
@@ -101,8 +101,12 @@ function loadConfig(argv) {
   // Names the QA and the clean scan look for: config list plus the optional names file (one per line).
   const names = [...(cfg.qa.names || [])];
   const nf = cfg.qa.namesFile ? abs(cfg.qa.namesFile) : null;
-  if (nf && fs.existsSync(nf)) for (const n of fs.readFileSync(nf, "utf8").split(/\r?\n/).map((x) => x.trim()).filter((x) => x && !x.startsWith("#"))) names.push(n);
-  return { cfg, file, root, abs, sets, getSet, names: [...new Set(names)], reviewDir: abs(cfg.review.dir), KIT };
+  if (nf && fs.existsSync(nf)) for (const n of fs.readFileSync(nf, "utf8").replace(/^\uFEFF/, "").split(/\r?\n/).map((x) => x.trim()).filter((x) => x && !x.startsWith("#"))) names.push(n);
+  // Approved words for offline proofing: config list plus the optional dictionary file (one per line).
+  const dictionary = [...(cfg.qa.dictionary || [])];
+  const df = cfg.qa.dictionaryFile ? abs(cfg.qa.dictionaryFile) : null;
+  if (df && fs.existsSync(df)) for (const w of fs.readFileSync(df, "utf8").replace(/^\uFEFF/, "").split(/\r?\n/).map((x) => x.trim()).filter((x) => x && !x.startsWith("#"))) dictionary.push(w);
+  return { cfg, file, root, abs, sets, getSet, names: [...new Set(names)], dictionary: [...new Set(dictionary)], reviewDir: abs(cfg.review.dir), KIT };
 }
 
 // Live build name: "<prefix> NN - <Title> - <STATUS> YYYYMMDD-HHMM.docx"

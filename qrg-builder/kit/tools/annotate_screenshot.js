@@ -1,16 +1,18 @@
 #!/usr/bin/env node
-// annotate_screenshot.js: QRG callout engine (red box plus numbered badge matched to step numbers).
+// annotate_screenshot.js: QRG callout engine (brand accent box plus numbered badge matched to step numbers).
 //
-// Method: immutable source, crop, redact, red #C8122C box, provenance.json. Standalone (bare requires only).
+// Method: immutable source, crop, redact, brand accent box (palette.accent from qrg.config.json, fallback #C8122C),
+// provenance.json. Standalone (bare requires only).
 //
 // Usage:
-//   node tools/annotate_screenshot.js <manifest.json> [--grid]
+//   node tools/annotate_screenshot.js <manifest.json> [--grid] [--config=<path>] [--color=<hex>|--accent=<hex>]
 //
 // Manifest shape:
 // {
 //   "srcDir": "<abs dir of immutable source PNGs>",
 //   "outDir": "<abs dir for annotated outputs>",
 //   "displayWidth": 600,            // px the generator shows the image at (badge/stroke scale)
+//   "accent": "#1F5C99",            // optional hex override (with or without #); else qrg.config.json palette.accent, fallback #C8122C
 //   "figures": [
 //     { "src": "01.png", "out": "inv01_fig01.png", "note": "what this shows",
 //       "crop":   { "left": 0, "top": 0, "width": 800, "height": 400 },   // optional, source px
@@ -20,8 +22,8 @@
 //   ]
 // }
 // Coordinates for redact/boxes are in post-crop pixels. badge: tl|tr|bl|br|l|r|t|b|in|none.
-// "draw": false on a box skips the red rectangle and places only the badge (for sources that
-// already carry a red box; added 10/21/2026).
+// "draw": false on a box skips the callout rectangle and places only the badge (for sources that
+// already carry a callout box; added 10/21/2026).
 // A box with "n" but no w/h ({x, y, n}) draws a badge only, centered at x,y (for already-boxed images).
 // --grid writes <out>.grid.png (50 px grid on the cropped image) to help pick coordinates.
 // Writes <outDir>/provenance.json (source, crop, redactions, boxes, output). Source is never touched.
@@ -30,41 +32,98 @@ let sharp; try { sharp = require("sharp"); } catch (e) { console.error("STOP: sh
 const fs = require("fs");
 const path = require("path");
 
-const RED = "#C8122C";
-const args = process.argv.slice(2);
-const manifestPath = args.find(a => !a.startsWith("--"));
-const GRID = args.includes("--grid");
-if (!manifestPath) { console.error("usage: node annotate_screenshot.js <manifest.json> [--grid]"); process.exit(2); }
+const DEFAULT_ACCENT = "#C8122C";
+const CONTENT_IN = 6.5; // Standard US Letter (8.5 in wide, 1 in margins)
 
-const man = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-const baseDir = path.dirname(path.resolve(manifestPath));
-const srcDir = path.resolve(baseDir, man.srcDir);
-const outDir = path.resolve(baseDir, man.outDir);
-fs.mkdirSync(outDir, { recursive: true });
+function normalizeHexColor(raw, label) {
+  const hex = String(raw).trim().replace(/^#/, "");
+  if (!/^[0-9a-f]{6}$/i.test(hex)) {
+    throw new Error(`Invalid ${label} color ${JSON.stringify(raw)}: expected 6-digit hex (for example "1F5C99" or "#1F5C99")`);
+  }
+  return "#" + hex.toUpperCase();
+}
 
-// Opt-in print sizing (added after a reviewer found badges "a little small" and "slightly blurry" and expected them to be
-// a uniform size across the document). With "badgeIn" in the manifest (the printed
-// badge diameter in inches; 0.24 is the house size), each figure's badge and box stroke are sized from the width the figure
-// prints at, so every badge prints the same size whatever the crop or figure width. The printed width comes from the
-// figure's "printIn", else from the afig(K, "<out>", "<caption>", <width>) call in the manifest's "guide" file (path relative
-// to the manifest; no width = the 6.5 in content width), capped by the 5.25 in figure height limit the generators use
-// ("figMaxIn" overrides). A figure that would print below "minDpi" (default 220) is upscaled 2x (lanczos3) before the
-// overlay is drawn, so badge edges stay sharp. Box and redact coordinates stay in source (post-crop) pixels.
-// Manifests without "badgeIn" are drawn exactly as before.
-const BADGE_IN = man.badgeIn || 0;
-const MIN_DPI = man.minDpi || 220;
-const FIG_MAX_IN = man.figMaxIn || 5.25;
-const CONTENT_IN = 6.5;
-const guideWidths = {};
-if (man.guide) {
-  const g = fs.readFileSync(path.resolve(baseDir, man.guide), "utf8");
-  for (const m of g.matchAll(/afig\(\s*K\s*,\s*"([^"]+)"\s*,\s*"(?:[^"\\]|\\.)*"\s*(?:,\s*([0-9.]+))?\s*\)/g)) {
-    guideWidths[m[1]] = m[2] ? parseFloat(m[2]) : CONTENT_IN;
+function walkUpForConfig(startDir) {
+  let d = path.resolve(startDir);
+  for (;;) {
+    const candidate = path.join(d, "qrg.config.json");
+    if (fs.existsSync(candidate)) return candidate;
+    const up = path.dirname(d);
+    if (up === d) return null;
+    d = up;
   }
 }
-function printWidthIn(fig, W, H) {
+
+function parseArgs(argv) {
+  const opts = { manifestPath: null, grid: false, configPath: null, color: null };
+  const readVal = (flagName, inlineVal, i) => {
+    const v = inlineVal !== null ? inlineVal : argv[i + 1];
+    if (!v || (inlineVal === null && v.startsWith("--"))) throw new Error(`Missing value for ${flagName}`);
+    return { val: v, nextIndex: inlineVal !== null ? i : i + 1 };
+  };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--grid") { opts.grid = true; continue; }
+    if (a === "--config" || a.startsWith("--config=")) {
+      const r = readVal("--config", a.startsWith("--config=") ? a.slice("--config=".length) : null, i);
+      opts.configPath = r.val; i = r.nextIndex; continue;
+    }
+    if (a === "--color" || a.startsWith("--color=")) {
+      const r = readVal("--color", a.startsWith("--color=") ? a.slice("--color=".length) : null, i);
+      opts.color = r.val; i = r.nextIndex; continue;
+    }
+    if (a === "--accent" || a.startsWith("--accent=")) {
+      const r = readVal("--accent", a.startsWith("--accent=") ? a.slice("--accent=".length) : null, i);
+      opts.color = r.val; i = r.nextIndex; continue;
+    }
+    if (a.startsWith("--")) throw new Error(`Unknown option: ${a}`);
+    if (!opts.manifestPath) opts.manifestPath = a;
+    else throw new Error(`Unexpected extra argument: ${a}`);
+  }
+  return opts;
+}
+
+function findConfigFile({ explicitConfig, envConfig, baseDir, cwd }) {
+  if (explicitConfig) {
+    const p = path.resolve(explicitConfig);
+    if (!fs.existsSync(p)) throw new Error(`STOP: config file not found: ${p}`);
+    return p;
+  }
+  if (envConfig) {
+    const p = path.resolve(envConfig);
+    if (!fs.existsSync(p)) throw new Error(`STOP: QRG_CONFIG file not found: ${p}`);
+    return p;
+  }
+  return walkUpForConfig(baseDir) || walkUpForConfig(cwd);
+}
+
+function loadProjectConfig(configPath) {
+  const raw = JSON.parse(fs.readFileSync(configPath, "utf8"));
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(`STOP: ${configPath} must be a JSON object`);
+  }
+  if (raw.page !== undefined && raw.page !== "letter") {
+    const msg = raw.page === "a4"
+      ? 'STOP: qrg.config.json page "a4" is not supported; QRGs must use Standard US Letter ("letter", 8.5 x 11 in, 6.5 in content width)'
+      : 'STOP: qrg.config.json page must be "letter" (Standard US Letter, 8.5 x 11 in, 6.5 in content width); got ' + JSON.stringify(raw.page);
+    throw new Error(msg);
+  }
+  return raw;
+}
+
+function resolveAccent({ cliColor, manifest, projectCfg }) {
+  if (cliColor != null) return normalizeHexColor(cliColor, "--color/--accent");
+  if (manifest && manifest.accent != null) return normalizeHexColor(manifest.accent, "manifest accent");
+  if (manifest && manifest.color != null) return normalizeHexColor(manifest.color, "manifest color");
+  if (projectCfg && projectCfg.palette && projectCfg.palette.accent != null) {
+    return normalizeHexColor(projectCfg.palette.accent, "qrg.config.json palette.accent");
+  }
+  return DEFAULT_ACCENT;
+}
+
+function printWidthIn(fig, W, H, guideWidths, figMaxIn) {
   let w = Math.min(CONTENT_IN, fig.printIn || guideWidths[fig.out] || CONTENT_IN);
-  if (w * H / W > FIG_MAX_IN) w = FIG_MAX_IN * W / H;
+  if (w * H / W > figMaxIn) w = figMaxIn * W / H;
   return w;
 }
 
@@ -90,7 +149,7 @@ function badgeXY(b, pos, r, W, H) {
   return [Math.round(cx), Math.round(cy)];
 }
 
-function overlaySvg(W, H, fig, scale, rPrint) {
+function overlaySvg(W, H, fig, scale, rPrint, accent = DEFAULT_ACCENT) {
   // rPrint (print sizing, see BADGE_IN): badge radius in output pixels; the stroke keeps the same 2.6:11 ratio.
   const sw = rPrint ? Math.max(2, Math.round(rPrint * 2.6 / 11)) : Math.max(3, Math.round(2.6 * scale));
   const r = rPrint ? rPrint : Math.max(12, Math.round(11 * scale));
@@ -100,13 +159,13 @@ function overlaySvg(W, H, fig, scale, rPrint) {
     s += `<rect x="${d.x}" y="${d.y}" width="${d.w}" height="${d.h}" fill="${d.fill || "#ffffff"}"/>`;
   }
   for (const b of fig.boxes || []) {
-    if (!b.w || b.draw === false) continue; // draw:false = badge only (source already has a red box)
-    s += `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="${Math.round(sw * 1.5)}" fill="none" stroke="${RED}" stroke-width="${sw}"/>`;
+    if (!b.w || b.draw === false) continue; // draw:false = badge only (source already has a box)
+    s += `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="${Math.round(sw * 1.5)}" fill="none" stroke="${accent}" stroke-width="${sw}"/>`;
   }
   for (const b of fig.boxes || []) {
     if (b.n == null || b.badge === "none") continue;
     const [cx, cy] = badgeXY(b, b.badge || "tl", r, W, H);
-    s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${RED}" stroke="#ffffff" stroke-width="${Math.max(2, Math.round(sw * 0.6))}"/>`;
+    s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${accent}" stroke="#ffffff" stroke-width="${Math.max(2, Math.round(sw * 0.6))}"/>`;
     s += `<text x="${cx}" y="${cy}" dy="0.36em" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="${fs_}" fill="#ffffff">${b.n}</text>`;
   }
   return s + "</svg>";
@@ -119,7 +178,64 @@ function gridSvg(W, H) {
   return s + "</svg>";
 }
 
-(async () => {
+async function main() {
+  let cli;
+  try {
+    cli = parseArgs(process.argv.slice(2));
+  } catch (err) {
+    console.error(err.message);
+    console.error("usage: node annotate_screenshot.js <manifest.json> [--grid] [--config=<path>] [--color=<hex>|--accent=<hex>]");
+    process.exit(2);
+  }
+  const manifestPath = cli.manifestPath;
+  const GRID = cli.grid;
+  if (!manifestPath) {
+    console.error("usage: node annotate_screenshot.js <manifest.json> [--grid] [--config=<path>] [--color=<hex>|--accent=<hex>]");
+    process.exit(2);
+  }
+
+  const man = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  const baseDir = path.dirname(path.resolve(manifestPath));
+  let projectCfg = null;
+  let ACCENT = DEFAULT_ACCENT;
+  try {
+    const configPath = findConfigFile({
+      explicitConfig: cli.configPath,
+      envConfig: process.env.QRG_CONFIG || null,
+      baseDir,
+      cwd: process.cwd(),
+    });
+    projectCfg = configPath ? loadProjectConfig(configPath) : null;
+    ACCENT = resolveAccent({ cliColor: cli.color, manifest: man, projectCfg });
+  } catch (err) {
+    console.error(err.message);
+    process.exit(2);
+  }
+
+  const srcDir = path.resolve(baseDir, man.srcDir);
+  const outDir = path.resolve(baseDir, man.outDir);
+  fs.mkdirSync(outDir, { recursive: true });
+
+  // Opt-in print sizing (added after a reviewer found badges "a little small" and "slightly blurry" and expected them to be
+  // a uniform size across the document). With "badgeIn" in the manifest (the printed
+  // badge diameter in inches; 0.24 is the house size), each figure's badge and box stroke are sized from the width the figure
+  // prints at, so every badge prints the same size whatever the crop or figure width. The printed width comes from the
+  // figure's "printIn", else from the afig(K, "<out>", "<caption>", <width>) call in the manifest's "guide" file (path relative
+  // to the manifest; no width = the 6.5 in Standard US Letter content width), capped by the 5.25 in figure height limit the generators use
+  // ("figMaxIn" overrides). A figure that would print below "minDpi" (default 220) is upscaled 2x (lanczos3) before the
+  // overlay is drawn, so badge edges stay sharp. Box and redact coordinates stay in source (post-crop) pixels.
+  // Manifests without "badgeIn" are drawn exactly as before.
+  const BADGE_IN = man.badgeIn || 0;
+  const MIN_DPI = man.minDpi || 220;
+  const FIG_MAX_IN = man.figMaxIn || (projectCfg && projectCfg.figureMaxHeightIn) || 5.25;
+  const guideWidths = {};
+  if (man.guide) {
+    const g = fs.readFileSync(path.resolve(baseDir, man.guide), "utf8");
+    for (const m of g.matchAll(/afig\(\s*K\s*,\s*"([^"]+)"\s*,\s*"(?:[^"\\]|\\.)*"\s*(?:,\s*([0-9.]+))?\s*\)/g)) {
+      guideWidths[m[1]] = m[2] ? parseFloat(m[2]) : CONTENT_IN;
+    }
+  }
+
   const prov = [];
   const dispW = man.displayWidth || 600;
   for (const fig of man.figures) {
@@ -140,7 +256,7 @@ function gridSvg(W, H) {
     const W0 = W, H0 = H;
     if (BADGE_IN) {
       if (!fig.printIn && guideWidths[fig.out] == null) console.log("WARN " + fig.out + ": no printIn and no afig call in the guide; sized for " + CONTENT_IN + " in");
-      pIn = printWidthIn(fig, W0, H0);
+      pIn = printWidthIn(fig, W0, H0, guideWidths, FIG_MAX_IN);
       if (W0 / pIn < MIN_DPI) up = 2;
       if (up > 1) {
         base = await sharp(base0).resize(W0 * up, H0 * up, { kernel: "lanczos3" }).png().toBuffer();
@@ -150,10 +266,29 @@ function gridSvg(W, H) {
       }
       rPrint = Math.max(6, Math.round((BADGE_IN / 2) * W / pIn));
     }
-    await sharp(base).composite([{ input: Buffer.from(overlaySvg(W, H, ofig, scale, rPrint)), left: 0, top: 0 }]).png().toFile(out);
+    await sharp(base).composite([{ input: Buffer.from(overlaySvg(W, H, ofig, scale, rPrint, ACCENT)), left: 0, top: 0 }]).png().toFile(out);
     if (GRID) await sharp(base0).composite([{ input: Buffer.from(gridSvg(W0, H0)) }]).png().toFile(out.replace(/\.png$/, ".grid.png"));
-    prov.push({ out: fig.out, source: src, sourceSize: `${meta.width}x${meta.height}`, crop: fig.crop || null, outSize: `${W}x${H}`, redact: fig.redact || [], boxes: fig.boxes || [], note: fig.note || "", built: new Date().toISOString(), ...(BADGE_IN ? { printIn: +pIn.toFixed(2), badgeIn: BADGE_IN, upscale: up, dpi: Math.round(W / pIn) } : {}) });
-    console.log("OK", fig.out, `${W}x${H}`, `boxes=${(fig.boxes || []).length}` + (BADGE_IN ? ` print=${pIn.toFixed(2)}in dpi=${Math.round(W / pIn)} up=${up} r=${rPrint}px` : ""));
+    prov.push({ out: fig.out, source: src, sourceSize: `${meta.width}x${meta.height}`, crop: fig.crop || null, outSize: `${W}x${H}`, accent: ACCENT, redact: fig.redact || [], boxes: fig.boxes || [], note: fig.note || "", built: new Date().toISOString(), ...(BADGE_IN ? { printIn: +pIn.toFixed(2), badgeIn: BADGE_IN, upscale: up, dpi: Math.round(W / pIn) } : {}) });
+    console.log("OK", fig.out, `${W}x${H}`, `boxes=${(fig.boxes || []).length}`, `accent=${ACCENT}` + (BADGE_IN ? ` print=${pIn.toFixed(2)}in dpi=${Math.round(W / pIn)} up=${up} r=${rPrint}px` : ""));
   }
   fs.writeFileSync(path.join(outDir, "provenance.json"), JSON.stringify(prov, null, 1));
-})();
+}
+
+module.exports = {
+  DEFAULT_ACCENT,
+  CONTENT_IN,
+  normalizeHexColor,
+  parseArgs,
+  findConfigFile,
+  loadProjectConfig,
+  resolveAccent,
+  printWidthIn,
+  overlaySvg,
+};
+
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err && err.message ? err.message : err);
+    process.exit(1);
+  });
+}

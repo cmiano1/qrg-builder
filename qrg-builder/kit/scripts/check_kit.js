@@ -1,5 +1,5 @@
 // check_kit.js: a quick health check of the kit install. Syntax-checks every kit script (node --check, which never
-// runs a build), checks the packages and native/ESM modules (sharp, @napi-rs/canvas, pdfjs-dist), and checks
+// runs a build), checks the packages and native/ESM modules (sharp, @napi-rs/canvas, pdfjs-dist, harper.js), and checks
 // cross-platform DOCX-to-PDF renderer availability (LibreOffice, Portable/AppImage, or Windows Word fallback).
 // Usage: node qrg_kit/scripts/check_kit.js     (or  npm run check  in the kit folder)
 const fs = require("fs");
@@ -81,6 +81,20 @@ async function runCheck(opts = {}) {
   } catch (e) {
     no("pdfjs-dist does not load: " + e.message.split("\n")[0]);
   }
+  try {
+    const harper = await import("harper.js");
+    const { binary } = await import("harper.js/binary");
+    if (!harper.LocalLinter || !binary) throw new Error("missing LocalLinter or binary export");
+    const linter = new harper.LocalLinter({ binary, dialect: harper.Dialect.American });
+    try {
+      await linter.setup();
+    } finally {
+      await linter.dispose();
+    }
+    ok("harper.js loads (offline spelling and grammar proofing ready)");
+  } catch (e) {
+    no("harper.js does not load: " + String(e && e.message ? e.message : e).split("\n")[0]);
+  }
 
   console.log("\nRenderer (DOCX to PDF)");
   const renderer = discoverRenderer({ kitDir: KIT, ...(opts.discoverOpts || {}) });
@@ -99,5 +113,8 @@ async function runCheck(opts = {}) {
 module.exports = { MIN_NODE_MAJOR, isSupportedNodeVersion, runCheck };
 
 if (require.main === module) {
-  runCheck().then((code) => process.exit(code));
+  runCheck().then((code) => process.exit(code), (err) => {
+    console.error(err);
+    process.exit(1);
+  });
 }
